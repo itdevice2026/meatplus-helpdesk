@@ -61,6 +61,8 @@
   .prio::before{content:"";width:7px;height:7px;border-radius:2px;background:currentColor;transform:rotate(45deg)}
   .avatar{width:24px;height:24px;border-radius:50%;background:var(--accent2);display:inline-grid;place-items:center;font-size:11px;font-weight:600;color:#fff;margin-right:6px;vertical-align:middle}
   .unassigned{color:var(--muted);font-style:italic}
+  .reqname{font-weight:500}
+  .reqmail{color:var(--muted);font-size:11px;margin-top:1px}
   .empty{padding:50px;text-align:center;color:var(--muted)}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:100;align-items:flex-start;justify-content:center;padding:30px;overflow:auto}
   .overlay.show{display:flex}
@@ -303,7 +305,7 @@ function render(){
       <td><span class="pill s-${t.status}">${t.status.replace("_"," ")}</span></td>
       <td><span class="prio p-${t.priority}">${t.priority}</span></td>
       <td style="text-transform:capitalize">${esc(t.category)}</td>
-      <td>${esc(t.requester_name)}</td>
+      <td><div class="reqname">${esc(t.requester_name)}</div><div class="reqmail">${esc(t.requester_email)}</div></td>
       <td>${an?`<span class="avatar">${initials(an)}</span>${esc(an)}`:`<span class="unassigned">Unassigned</span>`}</td>
       <td style="color:var(--muted)">${ago(t.updated_at)}</td>
     </tr>`;
