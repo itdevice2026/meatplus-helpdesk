@@ -172,6 +172,7 @@
     <span class="sub" style="font-size:14px">IT Helpdesk · Ticketing System</span>
   </div>
   <div class="who">
+    <button class="btn ghost sm" id="subjBtn" style="display:none">🏷 Subjects</button>
     <button class="btn ghost sm" id="adminBtn" style="display:none">⚙ Manage team</button>
     <div class="me"><span class="avatar" id="meAvatar"></span><span id="meName"></span><span class="rolebadge" id="meRole"></span></div>
     <button class="signout" id="pwBtn" title="Change your password">Change password</button>
@@ -206,7 +207,7 @@
   <div class="modal">
     <h2>🎫 New Ticket <button class="close" data-close>&times;</button></h2>
     <div class="body">
-      <div class="field"><label>Subject *</label><input id="n_subject" placeholder="Short summary of the issue" /></div>
+      <div class="field"><label>Subject *</label><input id="n_subject" list="subjectDL" autocomplete="off" placeholder="Pick a common subject or type your own" /><datalist id="subjectDL"></datalist></div>
       <div class="field"><label>Description</label><textarea id="n_desc" placeholder="Details, steps to reproduce, error messages…"></textarea></div>
       <div class="row2">
         <div class="field"><label>Requester name *</label><input id="n_rname" placeholder="Employee name" /></div>
@@ -250,6 +251,14 @@
   </div>
 </div>
 
+<!-- Admin: manage subjects modal -->
+<div class="overlay" id="subjModal">
+  <div class="modal">
+    <h2>🏷 Manage subjects <button class="close" data-close>&times;</button></h2>
+    <div class="body" id="subjBody"></div>
+  </div>
+</div>
+
 <!-- Admin: manage team modal -->
 <div class="overlay" id="adminModal">
   <div class="modal">
@@ -288,6 +297,62 @@ async function loadAgents(){
   $("#fAgent").innerHTML = `<option value="">All agents</option><option value="__un">Unassigned</option>`+opts;
 }
 function agentName(id){ const a=AGENTS.find(x=>x.id===id); return a?a.name:null; }
+
+let SUBJECTS=[];
+async function loadSubjects(){
+  const {data}=await db.from("ticket_subjects").select("label").eq("active",true).order("usage_count",{ascending:false}).order("label");
+  SUBJECTS=(data||[]).map(s=>s.label);
+  const dl=$("#subjectDL"); if(dl) dl.innerHTML=SUBJECTS.map(l=>`<option value="${esc(l)}"></option>`).join("");
+}
+async function openSubjects(){
+  $("#subjModal").classList.add("show");
+  $("#subjBody").innerHTML=`<div class="loading">Loading…</div>`;
+  const {data}=await db.from("ticket_subjects").select("*").order("label");
+  $("#subjBody").innerHTML=`
+    <style>
+      #subjBody .sin{width:100%;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit}
+      #subjBody .addbox{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:16px;display:flex;gap:8px}
+      #subjBody .srow{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+      #subjBody .srow .lbl{flex:1}
+      #subjBody .cnt{color:var(--muted);font-size:11px;white-space:nowrap}
+      #subjBody .off{opacity:.5}
+    </style>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:10px">These appear as choices on the New Ticket and public submit forms. Any new subject typed on either form is added here automatically.</p>
+    <div class="addbox">
+      <input class="sin" id="subj_new" placeholder="Add a new subject…" />
+      <button class="btn sm" onclick="addSubject()">Add</button>
+    </div>
+    ${(data||[]).map(s=>`
+      <div class="srow ${s.active?'':'off'}">
+        <input class="sin lbl" value="${esc(s.label)}" onchange="renameSubject(${s.id},this.value)" />
+        <span class="cnt">${s.usage_count} use${s.usage_count===1?'':'s'}</span>
+        <button class="btn ghost sm" onclick="toggleSubject(${s.id},${s.active?'false':'true'})">${s.active?'Hide':'Show'}</button>
+        <button class="btn danger sm" onclick="removeSubject(${s.id})">Remove</button>
+      </div>`).join("")}`;
+}
+async function addSubject(){
+  const label=$("#subj_new").value.trim(); if(!label){ toast("Type a subject first",true); return; }
+  const {error}=await db.from("ticket_subjects").insert({label});
+  if(error){ toast(/duplicate|unique/i.test(error.message)?"That subject already exists":error.message,true); return; }
+  await loadSubjects(); toast("Subject added ✓"); openSubjects();
+}
+async function renameSubject(id,label){
+  label=(label||"").trim(); if(!label){ openSubjects(); return; }
+  const {error}=await db.from("ticket_subjects").update({label}).eq("id",id);
+  if(error){ toast(/duplicate|unique/i.test(error.message)?"Another subject already has that name":error.message,true); openSubjects(); return; }
+  await loadSubjects(); toast("Renamed ✓");
+}
+async function toggleSubject(id,active){
+  const {error}=await db.from("ticket_subjects").update({active}).eq("id",id);
+  if(error){ toast(error.message,true); return; }
+  await loadSubjects(); toast(active?"Shown ✓":"Hidden ✓"); openSubjects();
+}
+async function removeSubject(id){
+  if(!confirm("Remove this subject from the list? Existing tickets keep their subject; it just won't be offered as a future choice.")) return;
+  const {error}=await db.from("ticket_subjects").delete().eq("id",id);
+  if(error){ toast(error.message,true); return; }
+  await loadSubjects(); toast("Removed ✓"); openSubjects();
+}
 
 async function loadStats(){
   const {data} = await db.from("ticket_stats").select("*").single();
@@ -505,6 +570,7 @@ async function addMember(){
 $("#newBtn").onclick=openNew;
 $("#createBtn").onclick=createTicket;
 $("#adminBtn").onclick=openAdmin;
+$("#subjBtn").onclick=openSubjects;
 ["search","fStatus","fPriority","fAgent"].forEach(id=>$("#"+id).addEventListener("input",render));
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>b.closest(".overlay").classList.remove("show"));
 document.querySelectorAll(".overlay").forEach(o=>o.onclick=e=>{if(e.target===o)o.classList.remove("show");});
@@ -518,6 +584,7 @@ function applyRole(){
   $("#meRole").className = "rolebadge r-"+ROLE;
   $("#newBtn").style.display = canEdit() ? "" : "none";
   $("#adminBtn").style.display = isAdmin() ? "" : "none";
+  $("#subjBtn").style.display = isAdmin() ? "" : "none";
   $("#roBanner").style.display = ROLE==='manager' ? "block" : "none";
 }
 async function startApp(){
@@ -534,7 +601,7 @@ async function startApp(){
 async function enterApp(){
   $("#login").style.display="none"; $("#forcePw").style.display="none"; $("#app").style.display="block";
   applyRole();
-  await loadAgents(); await Promise.all([loadStats(),loadTickets()]);
+  await loadAgents(); await loadSubjects(); await Promise.all([loadStats(),loadTickets()]);
 }
 async function submitForcePw(){
   const a=$("#fp_new").value, b=$("#fp_confirm").value; $("#fp_err").textContent="";

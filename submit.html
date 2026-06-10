@@ -52,7 +52,7 @@
       <div class="field"><label>Your name *</label><input id="f_name" placeholder="Full name" /></div>
       <div class="field"><label>Your email *</label><input id="f_email" type="email" placeholder="name@meatplus.ph" /></div>
     </div>
-    <div class="field"><label>Subject *</label><input id="f_subject" placeholder="Short summary of the issue" /></div>
+    <div class="field"><label>Subject *</label><input id="f_subject" list="f_subjectDL" autocomplete="off" placeholder="Pick a common subject or type your own" /><datalist id="f_subjectDL"></datalist></div>
     <div class="field"><label>Describe the problem</label><textarea id="f_desc" placeholder="What's happening? Any error messages, when it started, what you've tried…"></textarea></div>
     <div class="row2">
       <div class="field"><label>Category</label><select id="f_category"><option>hardware</option><option>software</option><option>network</option><option>account</option><option>email</option><option>security</option><option>access</option><option selected>other</option></select></div>
@@ -99,6 +99,13 @@ async function submitTicket(){
     <button class="btn" onclick="location.reload()">Submit another</button>`;
   box.appendChild(s);
 }
+// Populate subject choices from the catalog (anon read-only)
+(async()=>{
+  const {data}=await db.from("ticket_subjects").select("label").eq("active",true).order("usage_count",{ascending:false}).order("label");
+  const dl=$("#f_subjectDL");
+  if(dl&&data){ const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); dl.innerHTML=data.map(s=>`<option value="${esc(s.label)}"></option>`).join(""); }
+})();
+
 $("#submitBtn").onclick=submitTicket;
 [ "f_subject","f_email" ].forEach(id=>$("#"+id).addEventListener("keydown",e=>{if(e.key==="Enter")submitTicket();}));
 </script>
