@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MeatPlus IT Helpdesk</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#1a212b; --panel2:#222c38; --line:#2d3845;
+    --txt:#e6edf3; --muted:#8b98a5; --accent:#3b82f6; --accent2:#2563eb;
+    --green:#22c55e; --amber:#f59e0b; --red:#ef4444; --purple:#a855f7; --cyan:#06b6d4;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:14px 22px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:50}
+  header .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px}
+  header .logo .dot{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--purple));display:grid;place-items:center;font-size:15px}
+  header .sub{color:var(--muted);font-weight:400;font-size:12px}
+  header .who{margin-left:auto;display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+  header select{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:7px;padding:6px 10px;font-size:13px}
+  .wrap{max-width:1240px;margin:0 auto;padding:22px}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 15px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+  .btn:hover{background:var(--accent2)}
+  .btn.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--txt)}
+  .btn.ghost:hover{background:var(--line)}
+  .btn.sm{padding:5px 10px;font-size:12px}
+  /* stats */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .stat .n{font-size:28px;font-weight:700}
+  .stat .l{color:var(--muted);font-size:12px;margin-top:4px;text-transform:uppercase;letter-spacing:.4px}
+  .stat .bar{height:3px;border-radius:3px;margin-top:10px;background:var(--line);overflow:hidden}
+  .stat .bar i{display:block;height:100%}
+  /* toolbar */
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}
+  .toolbar input,.toolbar select{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:13px}
+  .toolbar input[type=search]{min-width:240px;flex:1}
+  /* table */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);font-size:13px}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;background:var(--panel2)}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--panel2)}
+  td .tn{font-family:ui-monospace,monospace;color:var(--muted);font-size:12px}
+  .pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:600;text-transform:capitalize;white-space:nowrap}
+  .pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+  .s-open{background:rgba(59,130,246,.15);color:#60a5fa}
+  .s-in_progress{background:rgba(168,85,247,.15);color:#c084fc}
+  .s-pending{background:rgba(245,158,11,.15);color:#fbbf24}
+  .s-resolved{background:rgba(34,197,94,.15);color:#4ade80}
+  .s-closed{background:rgba(139,152,165,.15);color:#9aa6b2}
+  .p-low{color:#9aa6b2}.p-medium{color:#60a5fa}.p-high{color:#fbbf24}.p-urgent{color:#f87171}
+  .prio{font-weight:600;text-transform:capitalize;display:inline-flex;align-items:center;gap:5px}
+  .prio::before{content:"";width:7px;height:7px;border-radius:2px;background:currentColor;transform:rotate(45deg)}
+  .avatar{width:24px;height:24px;border-radius:50%;background:var(--accent2);display:inline-grid;place-items:center;font-size:11px;font-weight:600;color:#fff;margin-right:6px;vertical-align:middle}
+  .unassigned{color:var(--muted);font-style:italic}
+  .empty{padding:50px;text-align:center;color:var(--muted)}
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:100;align-items:flex-start;justify-content:center;padding:30px;overflow:auto}
+  .overlay.show{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;width:100%;max-width:680px;animation:pop .15s ease}
+  @keyframes pop{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+  .modal h2{padding:18px 22px;border-bottom:1px solid var(--line);font-size:16px;display:flex;align-items:center;gap:10px}
+  .modal .close{margin-left:auto;cursor:pointer;color:var(--muted);font-size:22px;line-height:1;background:none;border:none}
+  .modal .body{padding:22px;max-height:70vh;overflow:auto}
+  .field{margin-bottom:14px}
+  .field label{display:block;color:var(--muted);font-size:12px;margin-bottom:5px;font-weight:600}
+  .field input,.field textarea,.field select{width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit}
+  .field textarea{min-height:90px;resize:vertical}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .modal .foot{padding:16px 22px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end}
+  /* detail */
+  .dt-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+  .dt-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px;margin:14px 0}
+  .dt-meta .k{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+  .dt-meta select{width:100%;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:13px}
+  .desc{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px;white-space:pre-wrap;line-height:1.5;color:#cdd6df}
+  .tabs{display:flex;gap:6px;margin:18px 0 12px;border-bottom:1px solid var(--line)}
+  .tabs button{background:none;border:none;color:var(--muted);padding:9px 13px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent}
+  .tabs button.active{color:var(--txt);border-bottom-color:var(--accent)}
+  .comment{display:flex;gap:10px;margin-bottom:14px}
+  .comment .b{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .comment .b .top{display:flex;gap:8px;align-items:center;margin-bottom:5px}
+  .comment .b .nm{font-weight:600;font-size:13px}
+  .comment .b .tm{color:var(--muted);font-size:11px}
+  .comment .b .txt{color:#cdd6df;line-height:1.5;white-space:pre-wrap}
+  .tag-int{background:rgba(245,158,11,.15);color:#fbbf24;font-size:10px;padding:2px 6px;border-radius:5px;font-weight:600}
+  .act{display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px;color:#cdd6df}
+  .act .tm{color:var(--muted);font-size:11px;white-space:nowrap}
+  .act .ico{width:22px;height:22px;border-radius:50%;background:var(--panel2);display:grid;place-items:center;font-size:11px;flex-shrink:0}
+  .addc{display:flex;gap:10px;margin-top:14px}
+  .addc textarea{flex:1;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px;min-height:60px;font-family:inherit;font-size:13px}
+  .chk{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;margin-top:6px}
+  .toast{position:fixed;bottom:22px;right:22px;background:var(--green);color:#04210f;padding:11px 16px;border-radius:9px;font-weight:600;font-size:13px;z-index:200;opacity:0;transform:translateY(10px);transition:.2s;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .toast.show{opacity:1;transform:none}
+  .toast.err{background:var(--red);color:#fff}
+  .loading{padding:40px;text-align:center;color:var(--muted)}
+  /* login */
+  #login{position:fixed;inset:0;background:radial-gradient(circle at 30% 20%,#172033,#0f1419);display:grid;place-items:center;z-index:300}
+  #login .box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:34px;width:100%;max-width:380px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+  #login .brand{display:flex;align-items:center;gap:11px;font-weight:700;font-size:19px;margin-bottom:4px}
+  #login .brand .dot{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--purple));display:grid;place-items:center;font-size:18px}
+  #login p.sub{color:var(--muted);font-size:13px;margin-bottom:22px}
+  #login .field{margin-bottom:14px}
+  #login label{display:block;color:var(--muted);font-size:12px;margin-bottom:5px;font-weight:600}
+  #login input{width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:11px 13px;font-size:14px}
+  #login .btn{width:100%;padding:12px;font-size:14px;margin-top:6px}
+  #login .err{color:var(--red);font-size:13px;min-height:18px;margin-top:10px}
+  #app{display:none}
+  header .signout{cursor:pointer;color:var(--muted);background:none;border:none;font-size:13px;text-decoration:underline}
+</style>
+</head>
+<body>
+<!-- Login gate -->
+<div id="login">
+  <div class="box">
+    <div class="brand"><span class="dot">🎫</span> MeatPlus IT Helpdesk</div>
+    <p class="sub">Sign in to access the ticketing system.</p>
+    <div class="field"><label>Email</label><input id="li_email" type="email" placeholder="name@meatplus.ph" autocomplete="username" /></div>
+    <div class="field"><label>Password</label><input id="li_pw" type="password" placeholder="••••••••" autocomplete="current-password" /></div>
+    <button class="btn" id="li_btn">Sign in</button>
+    <div class="err" id="li_err"></div>
+  </div>
+</div>
+
+<div id="app">
+<header>
+  <div class="logo"><span class="dot">🎫</span> MeatPlus IT Helpdesk <span class="sub">Ticketing System</span></div>
+  <div class="who">
+    <span>Acting as:</span>
+    <select id="actorSel" title="Who you are — used as author on comments & changes"></select>
+    <button class="signout" id="signoutBtn" title="Sign out">Sign out</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="stats" id="stats"></div>
+
+  <div class="toolbar">
+    <input type="search" id="search" placeholder="Search subject, requester, ticket #..." />
+    <select id="fStatus"><option value="">All statuses</option><option>open</option><option>in_progress</option><option>pending</option><option>resolved</option><option>closed</option></select>
+    <select id="fPriority"><option value="">All priorities</option><option>urgent</option><option>high</option><option>medium</option><option>low</option></select>
+    <select id="fAgent"><option value="">All agents</option><option value="__un">Unassigned</option></select>
+    <button class="btn" id="newBtn">+ New Ticket</button>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead><tr>
+        <th>#</th><th>Subject</th><th>Status</th><th>Priority</th><th>Category</th><th>Requester</th><th>Assigned</th><th>Updated</th>
+      </tr></thead>
+      <tbody id="rows"><tr><td colspan="8" class="loading">Loading tickets…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- New ticket modal -->
+<div class="overlay" id="newModal">
+  <div class="modal">
+    <h2>🎫 New Ticket <button class="close" data-close>&times;</button></h2>
+    <div class="body">
+      <div class="field"><label>Subject *</label><input id="n_subject" placeholder="Short summary of the issue" /></div>
+      <div class="field"><label>Description</label><textarea id="n_desc" placeholder="Details, steps to reproduce, error messages…"></textarea></div>
+      <div class="row2">
+        <div class="field"><label>Requester name *</label><input id="n_rname" placeholder="Employee name" /></div>
+        <div class="field"><label>Requester email *</label><input id="n_remail" placeholder="name@meatplus.ph" /></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Priority</label><select id="n_priority"><option>low</option><option selected>medium</option><option>high</option><option>urgent</option></select></div>
+        <div class="field"><label>Category</label><select id="n_category"><option>hardware</option><option>software</option><option>network</option><option>account</option><option>email</option><option>security</option><option>access</option><option selected>other</option></select></div>
+      </div>
+      <div class="field"><label>Assign to</label><select id="n_agent"><option value="">— Unassigned —</option></select></div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" data-close>Cancel</button>
+      <button class="btn" id="createBtn">Create Ticket</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail modal -->
+<div class="overlay" id="detailModal">
+  <div class="modal" style="max-width:760px">
+    <h2><span id="d_num" class="tn"></span> <button class="close" data-close>&times;</button></h2>
+    <div class="body" id="detailBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+</div><!-- /#app -->
+
+<script>
+const SUPABASE_URL = "https://emkcwukiqxnvcbhkjiqz.supabase.co";
+const SUPABASE_KEY = "sb_publishable_u_qnmEI8oHI9Z_A0-Hht3Q_Yvaa7Ork";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let AGENTS = [], TICKETS = [], CURRENT = null, ACTOR = null;
+const $ = s => document.querySelector(s);
+const esc = s => (s??"").toString().replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const initials = n => (n||"?").split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();
+const ago = d => { if(!d) return "—"; const s=(Date.now()-new Date(d))/1e3;
+  if(s<60)return"just now"; if(s<3600)return Math.floor(s/60)+"m ago";
+  if(s<86400)return Math.floor(s/3600)+"h ago"; if(s<2592000)return Math.floor(s/86400)+"d ago";
+  return new Date(d).toLocaleDateString(); };
+const fmt = d => d? new Date(d).toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
+
+function toast(msg, err){ const t=$("#toast"); t.textContent=msg; t.className="toast show"+(err?" err":""); setTimeout(()=>t.className="toast",2600); }
+
+async function loadAgents(){
+  const {data} = await db.from("ticket_agents").select("*").eq("active",true).order("name");
+  AGENTS = data||[];
+  const opts = AGENTS.map(a=>`<option value="${a.id}">${esc(a.name)}${a.role==='admin'?' (admin)':''}</option>`).join("");
+  $("#actorSel").innerHTML = opts;
+  $("#n_agent").innerHTML = `<option value="">— Unassigned —</option>`+opts;
+  $("#fAgent").innerHTML = `<option value="">All agents</option><option value="__un">Unassigned</option>`+opts;
+  ACTOR = AGENTS[0]?.name || "Agent";
+}
+function agentName(id){ const a=AGENTS.find(x=>x.id===id); return a?a.name:null; }
+
+async function loadStats(){
+  const {data} = await db.from("ticket_stats").select("*").single();
+  const s = data||{};
+  const active = (s.total||0)-(s.resolved||0)-(s.closed||0);
+  const cards = [
+    {n:active,l:"Active",c:"--accent",f:s.total?active/s.total:0},
+    {n:s.open||0,l:"Open",c:"--accent",f:s.total?s.open/s.total:0},
+    {n:s.in_progress||0,l:"In Progress",c:"--purple",f:s.total?s.in_progress/s.total:0},
+    {n:s.urgent_open||0,l:"Urgent Open",c:"--red",f:s.total?s.urgent_open/s.total:0},
+    {n:s.unassigned||0,l:"Unassigned",c:"--amber",f:s.total?s.unassigned/s.total:0},
+    {n:s.resolved||0,l:"Resolved",c:"--green",f:s.total?s.resolved/s.total:0},
+  ];
+  $("#stats").innerHTML = cards.map(c=>`<div class="stat"><div class="n" style="color:var(${c.c})">${c.n}</div><div class="l">${c.l}</div><div class="bar"><i style="width:${Math.round(c.f*100)}%;background:var(${c.c})"></i></div></div>`).join("");
+}
+
+async function loadTickets(){
+  const {data,error} = await db.from("tickets").select("*").order("updated_at",{ascending:false});
+  if(error){ toast(error.message,true); return; }
+  TICKETS = data||[]; render();
+}
+
+function render(){
+  const q=$("#search").value.toLowerCase(), fs=$("#fStatus").value, fp=$("#fPriority").value, fa=$("#fAgent").value;
+  let list = TICKETS.filter(t=>{
+    if(fs && t.status!==fs) return false;
+    if(fp && t.priority!==fp) return false;
+    if(fa==="__un" && t.assigned_agent_id) return false;
+    if(fa && fa!=="__un" && t.assigned_agent_id!==fa) return false;
+    if(q){ const hay=(t.subject+" "+t.requester_name+" "+t.ticket_number+" "+t.requester_email).toLowerCase(); if(!hay.includes(q)) return false; }
+    return true;
+  });
+  if(!list.length){ $("#rows").innerHTML=`<tr><td colspan="8" class="empty">No tickets match your filters.</td></tr>`; return; }
+  $("#rows").innerHTML = list.map(t=>{
+    const an=agentName(t.assigned_agent_id);
+    return `<tr onclick="openDetail(${t.id})">
+      <td><span class="tn">${esc(t.ticket_number)}</span></td>
+      <td>${esc(t.subject)}</td>
+      <td><span class="pill s-${t.status}">${t.status.replace("_"," ")}</span></td>
+      <td><span class="prio p-${t.priority}">${t.priority}</span></td>
+      <td style="text-transform:capitalize">${esc(t.category)}</td>
+      <td>${esc(t.requester_name)}</td>
+      <td>${an?`<span class="avatar">${initials(an)}</span>${esc(an)}`:`<span class="unassigned">Unassigned</span>`}</td>
+      <td style="color:var(--muted)">${ago(t.updated_at)}</td>
+    </tr>`;
+  }).join("");
+}
+
+/* ---- New ticket ---- */
+function openNew(){ ["n_subject","n_desc","n_rname","n_remail"].forEach(i=>$("#"+i).value=""); $("#n_priority").value="medium"; $("#n_category").value="other"; $("#n_agent").value=""; $("#newModal").classList.add("show"); }
+async function createTicket(){
+  const subject=$("#n_subject").value.trim(), rname=$("#n_rname").value.trim(), remail=$("#n_remail").value.trim();
+  if(!subject||!rname||!remail){ toast("Subject, requester name & email are required",true); return; }
+  const payload={subject,description:$("#n_desc").value.trim(),requester_name:rname,requester_email:remail,
+    priority:$("#n_priority").value,category:$("#n_category").value,
+    assigned_agent_id:$("#n_agent").value||null};
+  const {error}=await db.from("tickets").insert(payload);
+  if(error){ toast(error.message,true); return; }
+  $("#newModal").classList.remove("show"); toast("Ticket created ✓");
+  await Promise.all([loadStats(),loadTickets()]);
+}
+
+/* ---- Detail ---- */
+async function openDetail(id){
+  CURRENT=id; $("#detailModal").classList.add("show");
+  $("#detailBody").innerHTML=`<div class="loading">Loading…</div>`;
+  const [{data:t},{data:comments},{data:activity}] = await Promise.all([
+    db.from("tickets").select("*").eq("id",id).single(),
+    db.from("ticket_comments").select("*").eq("ticket_id",id).order("created_at"),
+    db.from("ticket_activity").select("*").eq("ticket_id",id).order("created_at",{ascending:false}),
+  ]);
+  if(!t){ $("#detailBody").innerHTML=`<div class="empty">Ticket not found.</div>`; return; }
+  $("#d_num").textContent=t.ticket_number;
+  const agentOpts = `<option value="">— Unassigned —</option>`+AGENTS.map(a=>`<option value="${a.id}" ${a.id===t.assigned_agent_id?"selected":""}>${esc(a.name)}</option>`).join("");
+  const sel=(field,val,opts)=>`<select onchange="updateField(${id},'${field}',this.value)">`+opts.map(o=>`<option ${o===val?"selected":""}>${o}</option>`).join("")+`</select>`;
+  $("#detailBody").innerHTML=`
+    <div class="dt-head"><h3 style="font-size:17px">${esc(t.subject)}</h3></div>
+    <div style="color:var(--muted);font-size:12px">Opened by ${esc(t.requester_name)} · ${esc(t.requester_email)} · ${fmt(t.created_at)}</div>
+    <div class="dt-meta">
+      <div><div class="k">Status</div>${sel("status",t.status,["open","in_progress","pending","resolved","closed"])}</div>
+      <div><div class="k">Priority</div>${sel("priority",t.priority,["low","medium","high","urgent"])}</div>
+      <div><div class="k">Category</div>${sel("category",t.category,["hardware","software","network","account","email","security","access","other"])}</div>
+      <div><div class="k">Assigned to</div><select onchange="updateField(${id},'assigned_agent_id',this.value||null)">${agentOpts}</select></div>
+    </div>
+    <div class="field"><label>Description</label><div class="desc">${esc(t.description)||'<span style="color:var(--muted)">No description.</span>'}</div></div>
+    <div class="tabs">
+      <button class="active" onclick="switchTab(this,'tabComments')">💬 Comments (${comments?.length||0})</button>
+      <button onclick="switchTab(this,'tabActivity')">📋 Activity (${activity?.length||0})</button>
+    </div>
+    <div id="tabComments">
+      ${(comments||[]).map(c=>`
+        <div class="comment">
+          <span class="avatar" style="background:${c.author_type==='requester'?'var(--cyan)':'var(--accent2)'}">${initials(c.author_name)}</span>
+          <div class="b"><div class="top"><span class="nm">${esc(c.author_name)}</span><span class="tm">${fmt(c.created_at)}</span>${c.is_internal?'<span class="tag-int">internal</span>':''}</div><div class="txt">${esc(c.body)}</div></div>
+        </div>`).join("") || '<div style="color:var(--muted);padding:8px 0">No comments yet.</div>'}
+      <div class="addc">
+        <textarea id="c_body" placeholder="Add a comment…"></textarea>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;margin-top:8px">
+        <label class="chk"><input type="checkbox" id="c_internal"> Internal note (not visible to requester)</label>
+        <button class="btn sm" style="margin-left:auto" onclick="addComment(${id})">Post comment</button>
+      </div>
+    </div>
+    <div id="tabActivity" style="display:none">
+      ${(activity||[]).map(a=>`<div class="act"><span class="ico">${actIcon(a.action)}</span><div style="flex:1"><b>${esc(a.actor)}</b> ${esc(a.action.replace("_"," "))} <span style="color:var(--muted)">${esc(a.detail)}</span></div><span class="tm">${fmt(a.created_at)}</span></div>`).join("") || '<div style="color:var(--muted)">No activity.</div>'}
+    </div>`;
+}
+function actIcon(a){return {created:"✨",status_changed:"🔄",priority_changed:"⚡",assignment_changed:"👤",commented:"💬"}[a]||"•";}
+function switchTab(btn,id){ document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active")); btn.classList.add("active"); $("#tabComments").style.display=id==="tabComments"?"block":"none"; $("#tabActivity").style.display=id==="tabActivity"?"block":"none"; }
+
+async function updateField(id,field,value){
+  const {error}=await db.from("tickets").update({[field]:value}).eq("id",id);
+  if(error){ toast(error.message,true); return; }
+  toast("Updated ✓");
+  await Promise.all([loadStats(),loadTickets()]);
+  openDetail(id);
+}
+async function addComment(id){
+  const body=$("#c_body").value.trim(); if(!body){ toast("Write something first",true); return; }
+  const internal=$("#c_internal").checked;
+  const {error}=await db.from("ticket_comments").insert({ticket_id:id,author_name:ACTOR,author_type:"agent",body,is_internal:internal});
+  if(error){ toast(error.message,true); return; }
+  await db.from("ticket_activity").insert({ticket_id:id,actor:ACTOR,action:"commented",detail:internal?"(internal note)":""});
+  $("#c_body").value=""; toast("Comment posted ✓"); openDetail(id);
+}
+
+/* ---- wire up ---- */
+$("#newBtn").onclick=openNew;
+$("#createBtn").onclick=createTicket;
+$("#actorSel").onchange=e=>{ACTOR=e.target.selectedOptions[0].text.replace(/ \(admin\)$/,"");};
+["search","fStatus","fPriority","fAgent"].forEach(id=>$("#"+id).addEventListener("input",render));
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>b.closest(".overlay").classList.remove("show"));
+document.querySelectorAll(".overlay").forEach(o=>o.onclick=e=>{if(e.target===o)o.classList.remove("show");});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")document.querySelectorAll(".overlay.show").forEach(o=>o.classList.remove("show"));});
+
+/* ---- auth gate ---- */
+let APP_STARTED=false;
+async function startApp(){
+  if(APP_STARTED) return; APP_STARTED=true;
+  $("#login").style.display="none"; $("#app").style.display="block";
+  await loadAgents(); await Promise.all([loadStats(),loadTickets()]);
+}
+async function doLogin(){
+  const email=$("#li_email").value.trim(), pw=$("#li_pw").value;
+  $("#li_err").textContent="";
+  if(!email||!pw){ $("#li_err").textContent="Enter your email and password."; return; }
+  $("#li_btn").textContent="Signing in…"; $("#li_btn").disabled=true;
+  const {error}=await db.auth.signInWithPassword({email,password:pw});
+  $("#li_btn").textContent="Sign in"; $("#li_btn").disabled=false;
+  if(error){ $("#li_err").textContent=error.message; return; }
+  await startApp();
+}
+$("#li_btn").onclick=doLogin;
+$("#li_pw").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin();});
+$("#signoutBtn").onclick=async()=>{ await db.auth.signOut(); location.reload(); };
+
+(async()=>{
+  const {data:{session}} = await db.auth.getSession();
+  if(session){ await startApp(); }
+  else { $("#login").style.display="grid"; }
+})();
+</script>
+</body>
+</html>
