@@ -65,11 +65,13 @@
   .reqmail{color:var(--muted);font-size:11px;margin-top:1px}
   .field input[type=file]{padding:8px;font-size:12px}
   .attwrap{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
-  .att{display:flex;flex-direction:column;align-items:center;gap:4px;width:98px;text-decoration:none;color:var(--muted);font-size:11px}
+  .att{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;width:98px;color:var(--muted);font-size:11px}
+  .att a{text-decoration:none;display:block}
   .att img{width:98px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:var(--panel2)}
-  .att.file{justify-content:center}
-  .att.file .ph{width:98px;height:74px;display:grid;place-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:8px;font-size:26px}
+  .att .ph{width:98px;height:74px;display:grid;place-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:8px;font-size:26px}
   .att .nm{max-width:98px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .attdel{position:absolute;top:3px;right:3px;z-index:2;background:rgba(0,0,0,.65);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;line-height:1;cursor:pointer;display:none}
+  .att:hover .attdel{display:block}
   .empty{padding:50px;text-align:center;color:var(--muted)}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:100;align-items:flex-start;justify-content:center;padding:30px;overflow:auto}
   .overlay.show{display:flex}
@@ -487,24 +489,36 @@ async function openDetail(id){
     <div id="tabActivity" style="display:none">
       ${(activity||[]).map(a=>`<div class="act"><span class="ico">${actIcon(a.action)}</span><div style="flex:1"><b>${esc(a.actor)}</b> ${esc(a.action.replace("_"," "))} <span style="color:var(--muted)">${esc(a.detail)}</span></div><span class="tm">${fmt(a.created_at)}</span></div>`).join("") || '<div style="color:var(--muted)">No activity.</div>'}
     </div>`;
-  if(t.attachment_count>0 && t.attachment_ref) loadAttachments(t.attachment_ref);
+  if(t.attachment_count>0 && t.attachment_ref) loadAttachments(t.attachment_ref, t.id);
 }
-async function loadAttachments(ref){
+async function loadAttachments(ref, ticketId){
   const box=$("#attBox"); if(!box) return;
   const {data,error}=await db.storage.from("ticket-files").list("tickets/"+ref,{limit:50});
   const files=(data||[]).filter(f=>f.name && f.name!==".emptyFolderPlaceholder");
   if(error||!files.length){ box.innerHTML=`<label>Attachments</label><div style="color:var(--muted);font-size:12px">${error?'Could not load attachments.':'None.'}</div>`; return; }
-  const items=await Promise.all(files.map(async f=>{
+  const items=files.map(f=>{
     const path="tickets/"+ref+"/"+f.name;
-    const {data:sg}=await db.storage.from("ticket-files").createSignedUrl(path,3600);
-    const url=sg?.signedUrl||"#";
+    const url=db.storage.from("ticket-files").getPublicUrl(path).data.publicUrl;
     const display=esc(f.name.replace(/^\d+_/,""));
     const isImg=/\.(png|jpe?g|gif|webp|bmp)$/i.test(f.name);
-    return isImg
-      ? `<a class="att" href="${url}" target="_blank" rel="noopener" title="${display}"><img src="${url}" alt="${display}"><span class="nm">${display}</span></a>`
-      : `<a class="att file" href="${url}" target="_blank" rel="noopener" title="${display}"><span class="ph">📄</span><span class="nm">${display}</span></a>`;
-  }));
+    const del=isAdmin()?`<button class="attdel" title="Delete attachment" onclick="event.preventDefault();event.stopPropagation();deleteAttachment('${path.replace(/'/g,"\\'")}',${ticketId})">✕</button>`:'';
+    const inner=isImg?`<img src="${url}" alt="${display}">`:`<span class="ph">📄</span>`;
+    return `<div class="att">${del}<a href="${url}" target="_blank" rel="noopener" title="${display}">${inner}</a><span class="nm">${display}</span></div>`;
+  });
   box.innerHTML=`<label>Attachments (${items.length})</label><div class="attwrap">${items.join("")}</div>`;
+}
+async function deleteAttachment(path, ticketId){
+  if(!confirm("Delete this attachment? This cannot be undone.")) return;
+  const {error}=await db.storage.from("ticket-files").remove([path]);
+  if(error){ toast(error.message,true); return; }
+  const t=TICKETS.find(x=>x.id===ticketId);
+  if(t && t.attachment_ref){
+    const {data}=await db.storage.from("ticket-files").list("tickets/"+t.attachment_ref,{limit:50});
+    const n=(data||[]).filter(f=>f.name && f.name!==".emptyFolderPlaceholder").length;
+    await db.from("tickets").update({attachment_count:n}).eq("id",ticketId);
+  }
+  toast("Attachment deleted ✓");
+  await loadTickets(); openDetail(ticketId);
 }
 function actIcon(a){return {created:"✨",status_changed:"🔄",priority_changed:"⚡",assignment_changed:"👤",commented:"💬"}[a]||"•";}
 function switchTab(btn,id){ document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active")); btn.classList.add("active"); $("#tabComments").style.display=id==="tabComments"?"block":"none"; $("#tabActivity").style.display=id==="tabActivity"?"block":"none"; }
