@@ -138,6 +138,7 @@
   <div class="who">
     <button class="btn ghost sm" id="adminBtn" style="display:none">⚙ Manage team</button>
     <div class="me"><span class="avatar" id="meAvatar"></span><span id="meName"></span><span class="rolebadge" id="meRole"></span></div>
+    <button class="signout" id="pwBtn" title="Change your password">Change password</button>
     <button class="signout" id="signoutBtn" title="Sign out">Sign out</button>
   </div>
 </header>
@@ -193,6 +194,23 @@
   <div class="modal" style="max-width:760px">
     <h2><span id="d_num" class="tn"></span> <button class="close" data-close>&times;</button></h2>
     <div class="body" id="detailBody"></div>
+  </div>
+</div>
+
+<!-- Change password modal -->
+<div class="overlay" id="pwModal">
+  <div class="modal" style="max-width:440px">
+    <h2>🔑 Change password <button class="close" data-close>&times;</button></h2>
+    <div class="body">
+      <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Set a new password for your account. You'll stay signed in.</p>
+      <div class="field"><label>New password</label><input id="pw_new" type="password" placeholder="At least 8 characters" autocomplete="new-password" /></div>
+      <div class="field"><label>Confirm new password</label><input id="pw_confirm" type="password" placeholder="Re-enter new password" autocomplete="new-password" /></div>
+      <div class="err" id="pw_err" style="color:var(--red);font-size:13px;min-height:16px"></div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" data-close>Cancel</button>
+      <button class="btn" id="pw_save">Update password</button>
+    </div>
   </div>
 </div>
 
@@ -491,6 +509,20 @@ async function doLogin(){
 $("#li_btn").onclick=doLogin;
 $("#li_pw").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin();});
 $("#signoutBtn").onclick=async()=>{ await db.auth.signOut(); location.reload(); };
+$("#pwBtn").onclick=()=>{ $("#pw_new").value=""; $("#pw_confirm").value=""; $("#pw_err").textContent=""; $("#pwModal").classList.add("show"); setTimeout(()=>$("#pw_new").focus(),50); };
+$("#pw_save").onclick=changePassword;
+$("#pw_confirm").addEventListener("keydown",e=>{if(e.key==="Enter")changePassword();});
+async function changePassword(){
+  const a=$("#pw_new").value, b=$("#pw_confirm").value;
+  $("#pw_err").textContent="";
+  if(a.length<8){ $("#pw_err").textContent="Password must be at least 8 characters."; return; }
+  if(a!==b){ $("#pw_err").textContent="The two passwords don't match."; return; }
+  const btn=$("#pw_save"); btn.disabled=true; btn.textContent="Updating…";
+  const {error}=await db.auth.updateUser({password:a});
+  btn.disabled=false; btn.textContent="Update password";
+  if(error){ $("#pw_err").textContent=error.message; return; }
+  $("#pwModal").classList.remove("show"); toast("Password updated ✓");
+}
 
 (async()=>{
   const {data:{session}} = await db.auth.getSession();
