@@ -58,6 +58,7 @@
       <div class="field"><label>Category</label><select id="f_category"><option>hardware</option><option>software</option><option>network</option><option>account</option><option>email</option><option>security</option><option>access</option><option selected>other</option></select></div>
       <div class="field"><label>How urgent?</label><select id="f_priority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
     </div>
+    <div class="field"><label>Attachments (optional)</label><input type="file" id="f_files" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" style="width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:10px;font-size:13px" /><div style="color:var(--muted);font-size:11px;margin-top:4px">Screenshots or documents that show the issue — up to 10 MB each.</div></div>
     <button class="btn" id="submitBtn">Submit ticket</button>
     <div class="err" id="err"></div>
   </div>
@@ -79,11 +80,23 @@ async function submitTicket(){
   $("#err").textContent="";
   if(!name||!email||!subject){ $("#err").textContent="Name, email, and subject are required."; return; }
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ $("#err").textContent="Please enter a valid email address."; return; }
-  $("#submitBtn").disabled=true; $("#submitBtn").textContent="Submitting…";
+  const files=$("#f_files").files;
+  $("#submitBtn").disabled=true; $("#submitBtn").textContent=files.length?"Uploading…":"Submitting…";
+  let ref=null;
+  if(files.length){
+    ref=crypto.randomUUID();
+    for(const f of files){
+      if(f.size>10485760){ $("#submitBtn").disabled=false; $("#submitBtn").textContent="Submit ticket"; $("#err").textContent=`"${f.name}" is larger than 10 MB.`; return; }
+      const safe=f.name.replace(/[^\w.\-]+/g,"_");
+      const {error:ue}=await db.storage.from("ticket-files").upload(`tickets/${ref}/${Date.now()}_${safe}`, f, {contentType:f.type||undefined, upsert:false});
+      if(ue){ $("#submitBtn").disabled=false; $("#submitBtn").textContent="Submit ticket"; $("#err").textContent=`Couldn't upload "${f.name}": ${ue.message}`; return; }
+    }
+  }
   const {error}=await db.from("tickets").insert({
     subject, description:$("#f_desc").value.trim(),
     requester_name:name, requester_email:email,
-    category:$("#f_category").value, priority:$("#f_priority").value
+    category:$("#f_category").value, priority:$("#f_priority").value,
+    attachment_ref:ref, attachment_count:files.length
     // status defaults to 'open', assignment left null (enforced by policy)
   });
   $("#submitBtn").disabled=false; $("#submitBtn").textContent="Submit ticket";

@@ -63,6 +63,13 @@
   .unassigned{color:var(--muted);font-style:italic}
   .reqname{font-weight:500}
   .reqmail{color:var(--muted);font-size:11px;margin-top:1px}
+  .field input[type=file]{padding:8px;font-size:12px}
+  .attwrap{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+  .att{display:flex;flex-direction:column;align-items:center;gap:4px;width:98px;text-decoration:none;color:var(--muted);font-size:11px}
+  .att img{width:98px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:var(--panel2)}
+  .att.file{justify-content:center}
+  .att.file .ph{width:98px;height:74px;display:grid;place-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:8px;font-size:26px}
+  .att .nm{max-width:98px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .empty{padding:50px;text-align:center;color:var(--muted)}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:100;align-items:flex-start;justify-content:center;padding:30px;overflow:auto}
   .overlay.show{display:flex}
@@ -218,6 +225,7 @@
         <div class="field"><label>Category</label><select id="n_category"><option>hardware</option><option>software</option><option>network</option><option>account</option><option>email</option><option>security</option><option>access</option><option selected>other</option></select></div>
       </div>
       <div class="field"><label>Assign to</label><select id="n_agent"><option value="">— Unassigned —</option></select></div>
+      <div class="field"><label>Attachments (optional)</label><input type="file" id="n_files" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" /><div style="color:var(--muted);font-size:11px;margin-top:4px">Images or documents, up to 10 MB each.</div></div>
     </div>
     <div class="foot">
       <button class="btn ghost" data-close>Cancel</button>
@@ -402,14 +410,27 @@ function render(){
 }
 
 /* ---- New ticket ---- */
-function openNew(){ ["n_subject","n_desc","n_rname","n_remail"].forEach(i=>$("#"+i).value=""); $("#n_priority").value="medium"; $("#n_category").value="other"; $("#n_agent").value=""; $("#newModal").classList.add("show"); }
+function openNew(){ ["n_subject","n_desc","n_rname","n_remail"].forEach(i=>$("#"+i).value=""); $("#n_priority").value="medium"; $("#n_category").value="other"; $("#n_agent").value=""; $("#n_files").value=""; $("#newModal").classList.add("show"); }
+async function uploadFiles(files, ref){
+  for(const f of files){
+    if(f.size>10485760) return {error:`"${f.name}" is larger than 10 MB.`};
+    const safe=f.name.replace(/[^\w.\-]+/g,"_");
+    const {error}=await db.storage.from("ticket-files").upload(`tickets/${ref}/${Date.now()}_${safe}`, f, {contentType:f.type||undefined, upsert:false});
+    if(error) return {error:`Couldn't upload "${f.name}": ${error.message}`};
+  }
+  return {};
+}
 async function createTicket(){
   const subject=$("#n_subject").value.trim(), rname=$("#n_rname").value.trim(), remail=$("#n_remail").value.trim();
   if(!subject||!rname||!remail){ toast("Subject, requester name & email are required",true); return; }
+  const files=$("#n_files").files; let ref=null;
+  const btn=$("#createBtn");
+  if(files.length){ btn.disabled=true; btn.textContent="Uploading…"; ref=crypto.randomUUID(); const up=await uploadFiles(files,ref); if(up.error){ btn.disabled=false; btn.textContent="Create Ticket"; toast(up.error,true); return; } }
   const payload={subject,description:$("#n_desc").value.trim(),requester_name:rname,requester_email:remail,
     priority:$("#n_priority").value,category:$("#n_category").value,
-    assigned_agent_id:$("#n_agent").value||null};
+    assigned_agent_id:$("#n_agent").value||null, attachment_ref:ref, attachment_count:files.length};
   const {error}=await db.from("tickets").insert(payload);
+  btn.disabled=false; btn.textContent="Create Ticket";
   if(error){ toast(error.message,true); return; }
   $("#newModal").classList.remove("show"); toast("Ticket created ✓");
   await Promise.all([loadStats(),loadTickets()]);
@@ -445,6 +466,7 @@ async function openDetail(id){
       <div><div class="k">Assigned to</div>${assignField}</div>
     </div>
     <div class="field"><label>Description</label><div class="desc">${esc(t.description)||'<span style="color:var(--muted)">No description.</span>'}</div></div>
+    ${t.attachment_count>0?`<div class="field" id="attBox"><label>Attachments (${t.attachment_count})</label><div style="color:var(--muted);font-size:12px">Loading…</div></div>`:''}
     <div class="tabs">
       <button class="active" onclick="switchTab(this,'tabComments')">💬 Comments (${comments?.length||0})</button>
       <button onclick="switchTab(this,'tabActivity')">📋 Activity (${activity?.length||0})</button>
@@ -465,6 +487,24 @@ async function openDetail(id){
     <div id="tabActivity" style="display:none">
       ${(activity||[]).map(a=>`<div class="act"><span class="ico">${actIcon(a.action)}</span><div style="flex:1"><b>${esc(a.actor)}</b> ${esc(a.action.replace("_"," "))} <span style="color:var(--muted)">${esc(a.detail)}</span></div><span class="tm">${fmt(a.created_at)}</span></div>`).join("") || '<div style="color:var(--muted)">No activity.</div>'}
     </div>`;
+  if(t.attachment_count>0 && t.attachment_ref) loadAttachments(t.attachment_ref);
+}
+async function loadAttachments(ref){
+  const box=$("#attBox"); if(!box) return;
+  const {data,error}=await db.storage.from("ticket-files").list("tickets/"+ref,{limit:50});
+  const files=(data||[]).filter(f=>f.name && f.name!==".emptyFolderPlaceholder");
+  if(error||!files.length){ box.innerHTML=`<label>Attachments</label><div style="color:var(--muted);font-size:12px">${error?'Could not load attachments.':'None.'}</div>`; return; }
+  const items=await Promise.all(files.map(async f=>{
+    const path="tickets/"+ref+"/"+f.name;
+    const {data:sg}=await db.storage.from("ticket-files").createSignedUrl(path,3600);
+    const url=sg?.signedUrl||"#";
+    const display=esc(f.name.replace(/^\d+_/,""));
+    const isImg=/\.(png|jpe?g|gif|webp|bmp)$/i.test(f.name);
+    return isImg
+      ? `<a class="att" href="${url}" target="_blank" rel="noopener" title="${display}"><img src="${url}" alt="${display}"><span class="nm">${display}</span></a>`
+      : `<a class="att file" href="${url}" target="_blank" rel="noopener" title="${display}"><span class="ph">📄</span><span class="nm">${display}</span></a>`;
+  }));
+  box.innerHTML=`<label>Attachments (${items.length})</label><div class="attwrap">${items.join("")}</div>`;
 }
 function actIcon(a){return {created:"✨",status_changed:"🔄",priority_changed:"⚡",assignment_changed:"👤",commented:"💬"}[a]||"•";}
 function switchTab(btn,id){ document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active")); btn.classList.add("active"); $("#tabComments").style.display=id==="tabComments"?"block":"none"; $("#tabActivity").style.display=id==="tabActivity"?"block":"none"; }
