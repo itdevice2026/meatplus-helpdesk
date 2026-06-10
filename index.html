@@ -379,26 +379,72 @@ async function openAdmin(){
   $("#adminBody").innerHTML=`<div class="loading">Loading team…</div>`;
   const {data} = await db.from("ticket_agents").select("*").order("name");
   $("#adminBody").innerHTML = `
-    <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Change roles or deactivate members. <b>Admin</b> manages everything, <b>Agent</b> works tickets, <b>Manager</b> is read-only oversight.</p>
+    <style>
+      #adminBody .am-in{width:100%;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit}
+      #adminBody .addbox{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:18px}
+      #adminBody .addbox h4{font-size:13px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+      #adminBody .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+      #adminBody .agentrow .role{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font-size:12px}
+      #adminBody .inactive{opacity:.5}
+    </style>
+    <div class="addbox">
+      <h4>➕ Add team member</h4>
+      <div class="g2">
+        <input class="am-in" id="am_name" placeholder="Full name" />
+        <input class="am-in" id="am_email" placeholder="email@meatplus.ph" />
+      </div>
+      <div class="g2">
+        <select class="am-in" id="am_role"><option value="agent">Agent</option><option value="manager">Manager</option><option value="admin">Admin</option></select>
+        <input class="am-in" id="am_pw" type="text" placeholder="Temp password (new logins only)" />
+      </div>
+      <button class="btn sm" id="am_btn" onclick="addMember()">Add member</button>
+      <div class="err" id="am_err" style="color:var(--red);font-size:12px;min-height:16px;margin-top:8px"></div>
+      <div style="color:var(--muted);font-size:11px">If the email already has a company login, it's linked automatically and the password is ignored.</div>
+    </div>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:10px"><b>Admin</b> manages everything · <b>Agent</b> works tickets · <b>Manager</b> is read-only. Disabling blocks sign-in; removing revokes helpdesk access (the company login is kept).</p>
     ${(data||[]).map(a=>`
-      <div class="agentrow">
+      <div class="agentrow ${a.active?'':'inactive'}">
         <span class="avatar">${initials(a.name)}</span>
-        <div style="flex:1"><div class="nm">${esc(a.name)}</div><div class="em">${esc(a.email)}</div></div>
-        <select onchange="setAgentRole('${a.id}',this.value)" ${a.user_id?'':'disabled title="No login linked"'}>
+        <div style="flex:1"><div class="nm">${esc(a.name)}${a.active?'':' <span style="color:var(--muted);font-weight:400">(disabled)</span>'}</div><div class="em">${esc(a.email)}</div></div>
+        <select class="role" onchange="setAgentRole('${a.id}',this.value)" ${a.user_id?'':'disabled title="No login linked"'}>
           ${["admin","agent","manager"].map(r=>`<option value="${r}" ${a.role===r?"selected":""}>${r}</option>`).join("")}
         </select>
-        <label class="chk"><input type="checkbox" ${a.active?"checked":""} onchange="setAgentActive('${a.id}',this.checked)"> active</label>
-      </div>`).join("")}
-    <p style="color:var(--muted);font-size:12px;margin-top:16px">To add a new member with a login, an account must first be created in Supabase — ask your admin or Claude to set one up.</p>`;
+        <button class="btn ghost sm" onclick="setAgentActive('${a.id}',${a.active?'false':'true'})">${a.active?'Disable':'Enable'}</button>
+        <button class="btn danger sm" onclick="removeMember('${a.id}','${esc(a.name).replace(/'/g,"")}')">Remove</button>
+      </div>`).join("")}`;
 }
 async function setAgentRole(id,role){
   const {error}=await db.from("ticket_agents").update({role}).eq("id",id);
+  if(!error) await loadAgents();
   toast(error?error.message:"Role updated ✓", !!error);
 }
 async function setAgentActive(id,active){
   const {error}=await db.from("ticket_agents").update({active}).eq("id",id);
-  if(!error) await loadAgents();
-  toast(error?error.message:"Updated ✓", !!error);
+  if(error){ toast(error.message,true); return; }
+  await loadAgents(); toast(active?"Account enabled ✓":"Account disabled ✓"); openAdmin();
+}
+async function removeMember(id,name){
+  if(!confirm(`Remove ${name} from the helpdesk?\n\nThey lose all helpdesk access and any tickets assigned to them become unassigned. Their company login is NOT deleted (it may be used by other systems).`)) return;
+  const {error}=await db.from("ticket_agents").delete().eq("id",id);
+  if(error){ toast(error.message,true); return; }
+  await Promise.all([loadAgents(),loadTickets()]); toast("Removed from helpdesk ✓"); openAdmin();
+}
+async function addMember(){
+  const name=$("#am_name").value.trim(), email=$("#am_email").value.trim().toLowerCase(), role=$("#am_role").value, password=$("#am_pw").value;
+  $("#am_err").textContent="";
+  if(!name||!email){ $("#am_err").textContent="Name and email are required."; return; }
+  const btn=$("#am_btn"); btn.disabled=true; btn.textContent="Adding…";
+  const {data,error}=await db.functions.invoke("manage-team",{body:{name,email,role,password}});
+  btn.disabled=false; btn.textContent="Add member";
+  if(error){
+    let msg=error.message||"Could not add member.";
+    try{ const c=await error.context.json(); if(c&&c.error) msg=c.error; }catch(e){}
+    $("#am_err").textContent=msg; return;
+  }
+  if(data&&data.error){ $("#am_err").textContent=data.error; return; }
+  await loadAgents();
+  toast(data&&data.created?"Login created & member added ✓":"Member added ✓");
+  openAdmin();
 }
 
 /* ---- wire up ---- */
