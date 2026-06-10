@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Submit a Ticket · MeatPlus IT Helpdesk</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#1a212b; --panel2:#222c38; --line:#2d3845;
+    --txt:#e6edf3; --muted:#8b98a5; --accent:#3b82f6; --accent2:#2563eb;
+    --green:#22c55e; --red:#ef4444; --purple:#a855f7;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:radial-gradient(circle at 30% 10%,#172033,#0f1419);color:var(--txt);min-height:100vh;padding:30px 16px;display:flex;justify-content:center}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:100%;max-width:560px;height:fit-content;box-shadow:0 24px 60px rgba(0,0,0,.45);overflow:hidden}
+  .head{padding:24px 28px;border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:700;font-size:20px}
+  .brand .dot{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--purple));display:grid;place-items:center;font-size:19px}
+  .head p{color:var(--muted);font-size:13px;margin-top:8px}
+  .body{padding:24px 28px}
+  .field{margin-bottom:16px}
+  .field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px;font-weight:600}
+  .field input,.field textarea,.field select{width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:11px 13px;font-size:14px;font-family:inherit}
+  .field textarea{min-height:120px;resize:vertical}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:600;cursor:pointer;transition:.15s;margin-top:6px}
+  .btn:hover{background:var(--accent2)}
+  .btn:disabled{opacity:.6;cursor:default}
+  .err{color:var(--red);font-size:13px;min-height:18px;margin-top:10px}
+  .foot{text-align:center;color:var(--muted);font-size:12px;padding:0 28px 22px}
+  .foot a{color:var(--accent);text-decoration:none}
+  .success{text-align:center;padding:40px 28px}
+  .success .ico{width:64px;height:64px;border-radius:50%;background:rgba(34,197,94,.15);color:var(--green);display:grid;place-items:center;font-size:32px;margin:0 auto 18px}
+  .success h2{font-size:20px;margin-bottom:8px}
+  .success p{color:var(--muted);font-size:14px;line-height:1.6}
+  .success .btn{max-width:240px;margin:22px auto 0}
+</style>
+</head>
+<body>
+<div class="box" id="box">
+  <div class="head">
+    <div class="brand"><span class="dot">🎫</span> MeatPlus IT Helpdesk</div>
+    <p>Submit a support request. Our IT team will pick it up — no login needed.</p>
+  </div>
+  <div class="body" id="form">
+    <div class="row2">
+      <div class="field"><label>Your name *</label><input id="f_name" placeholder="Full name" /></div>
+      <div class="field"><label>Your email *</label><input id="f_email" type="email" placeholder="name@meatplus.ph" /></div>
+    </div>
+    <div class="field"><label>Subject *</label><input id="f_subject" placeholder="Short summary of the issue" /></div>
+    <div class="field"><label>Describe the problem</label><textarea id="f_desc" placeholder="What's happening? Any error messages, when it started, what you've tried…"></textarea></div>
+    <div class="row2">
+      <div class="field"><label>Category</label><select id="f_category"><option>hardware</option><option>software</option><option>network</option><option>account</option><option>email</option><option>security</option><option>access</option><option selected>other</option></select></div>
+      <div class="field"><label>How urgent?</label><select id="f_priority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
+    </div>
+    <button class="btn" id="submitBtn">Submit ticket</button>
+    <div class="err" id="err"></div>
+  </div>
+  <div class="foot">IT staff? <a href="index.html">Sign in to the helpdesk →</a></div>
+</div>
+
+<script>
+const db = supabase.createClient(
+  "https://emkcwukiqxnvcbhkjiqz.supabase.co",
+  "sb_publishable_u_qnmEI8oHI9Z_A0-Hht3Q_Yvaa7Ork"
+);
+const $ = s => document.querySelector(s);
+
+async function submitTicket(){
+  const name=$("#f_name").value.trim(), email=$("#f_email").value.trim(), subject=$("#f_subject").value.trim();
+  $("#err").textContent="";
+  if(!name||!email||!subject){ $("#err").textContent="Name, email, and subject are required."; return; }
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ $("#err").textContent="Please enter a valid email address."; return; }
+  $("#submitBtn").disabled=true; $("#submitBtn").textContent="Submitting…";
+  const {error}=await db.from("tickets").insert({
+    subject, description:$("#f_desc").value.trim(),
+    requester_name:name, requester_email:email,
+    category:$("#f_category").value, priority:$("#f_priority").value
+    // status defaults to 'open', assignment left null (enforced by policy)
+  });
+  $("#submitBtn").disabled=false; $("#submitBtn").textContent="Submit ticket";
+  if(error){ $("#err").textContent="Sorry, something went wrong: "+error.message; return; }
+  $("#form").style.display="none";
+  document.querySelector(".head").style.display="none";
+  const box=$("#box");
+  box.querySelector(".foot").style.display="none";
+  const s=document.createElement("div");
+  s.className="success";
+  s.innerHTML=`<div class="ico">✓</div><h2>Ticket submitted!</h2>
+    <p>Thanks, ${name.replace(/[&<>"]/g,'')}. The IT team has received your request and will follow up by email at <b>${email.replace(/[&<>"]/g,'')}</b>.</p>
+    <button class="btn" onclick="location.reload()">Submit another</button>`;
+  box.appendChild(s);
+}
+$("#submitBtn").onclick=submitTicket;
+[ "f_subject","f_email" ].forEach(id=>$("#"+id).addEventListener("keydown",e=>{if(e.key==="Enter")submitTicket();}));
+</script>
+</body>
+</html>
