@@ -61,9 +61,12 @@
 </div>
 
 <script>
+// Public form must always post anonymously — use an isolated auth storage key
+// and don't persist/inherit any helpdesk login session from the same origin.
 const db = supabase.createClient(
   "https://emkcwukiqxnvcbhkjiqz.supabase.co",
-  "sb_publishable_u_qnmEI8oHI9Z_A0-Hht3Q_Yvaa7Ork"
+  "sb_publishable_u_qnmEI8oHI9Z_A0-Hht3Q_Yvaa7Ork",
+  { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: "mp-public-submit-noauth" } }
 );
 const $ = s => document.querySelector(s);
 
