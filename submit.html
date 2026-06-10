@@ -16,7 +16,8 @@
   .box{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:100%;max-width:560px;height:fit-content;box-shadow:0 24px 60px rgba(0,0,0,.45);overflow:hidden}
   .head{padding:24px 28px;border-bottom:1px solid var(--line)}
   .brand{display:flex;align-items:center;gap:11px;font-weight:700;font-size:20px}
-  .brand .dot{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--purple));display:grid;place-items:center;font-size:19px}
+  .mp-badge{background:#fff;border-radius:13px;padding:13px 22px;display:inline-flex;align-items:center}
+  .mp-badge img{display:block;height:74px;width:auto}
   .head p{color:var(--muted);font-size:13px;margin-top:8px}
   .body{padding:24px 28px}
   .field{margin-bottom:16px}
@@ -40,7 +41,10 @@
 <body>
 <div class="box" id="box">
   <div class="head">
-    <div class="brand"><span class="dot">🎫</span> MeatPlus IT Helpdesk</div>
+    <div class="brand" style="margin-bottom:6px">
+      <span class="mp-badge"><img src="logo.png" alt="MeatPlus Trading Corporation" /></span>
+    </div>
+    <p style="font-size:15px;color:var(--txt);font-weight:600;margin-top:6px">IT Helpdesk</p>
     <p>Submit a support request. Our IT team will pick it up — no login needed.</p>
   </div>
   <div class="body" id="form">

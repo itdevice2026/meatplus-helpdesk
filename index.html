@@ -117,13 +117,20 @@
   #login .pub{margin-top:18px;text-align:center;font-size:13px}
   #login .pub a{color:var(--accent);text-decoration:none}
   #app{display:none}
+  /* MeatPlus logo badge */
+  .mp-badge{background:#fff;border-radius:10px;padding:6px 13px;display:inline-flex;align-items:center}
+  .mp-badge img{display:block;height:34px;width:auto}
+  .mp-badge.lg{padding:14px 24px;border-radius:14px}
+  .mp-badge.lg img{height:82px}
 </style>
 </head>
 <body>
 <div id="login">
   <div class="box">
-    <div class="brand"><span class="dot">🎫</span> MeatPlus IT Helpdesk</div>
-    <p class="sub">Sign in to access the ticketing system.</p>
+    <div class="brand" style="justify-content:center;margin-bottom:14px">
+      <span class="mp-badge lg"><img src="logo.png" alt="MeatPlus Trading Corporation" /></span>
+    </div>
+    <p class="sub" style="text-align:center">IT Helpdesk — sign in to access the ticketing system.</p>
     <div class="field"><label>Email</label><input id="li_email" type="email" placeholder="name@meatplus.ph" autocomplete="username" /></div>
     <div class="field"><label>Password</label><input id="li_pw" type="password" placeholder="••••••••" autocomplete="current-password" /></div>
     <button class="btn" id="li_btn">Sign in</button>
@@ -134,7 +141,10 @@
 
 <div id="app">
 <header>
-  <div class="logo"><span class="dot">🎫</span> MeatPlus IT Helpdesk <span class="sub">Ticketing System</span></div>
+  <div class="logo">
+    <span class="mp-badge"><img src="logo.png" alt="MeatPlus" /></span>
+    <span class="sub" style="font-size:14px">IT Helpdesk · Ticketing System</span>
+  </div>
   <div class="who">
     <button class="btn ghost sm" id="adminBtn" style="display:none">⚙ Manage team</button>
     <div class="me"><span class="avatar" id="meAvatar"></span><span id="meName"></span><span class="rolebadge" id="meRole"></span></div>
