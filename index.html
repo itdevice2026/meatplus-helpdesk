@@ -460,10 +460,11 @@ async function createTicket(){
   const payload={subject,description:$("#n_desc").value.trim(),requester_name:rname,requester_email:remail,
     priority:$("#n_priority").value,category:$("#n_category").value,
     assigned_agent_id:$("#n_agent").value||null, attachment_ref:ref, attachment_count:files.length};
-  const {error}=await db.from("tickets").insert(payload);
+  const {data:ins,error}=await db.from("tickets").insert(payload).select("id").single();
   btn.disabled=false; btn.textContent="Create Ticket";
   if(error){ toast(error.message,true); return; }
   $("#newModal").classList.remove("show"); toast("Ticket created ✓");
+  if(payload.assigned_agent_id && ins && ins.id) notifyAssignment(ins.id);
   await Promise.all([loadStats(),loadTickets()]);
 }
 
@@ -552,10 +553,18 @@ async function deleteAttachment(path, ticketId){
 function actIcon(a){return {created:"✨",status_changed:"🔄",priority_changed:"⚡",assignment_changed:"👤",commented:"💬"}[a]||"•";}
 function switchTab(btn,id){ document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active")); btn.classList.add("active"); $("#tabComments").style.display=id==="tabComments"?"block":"none"; $("#tabActivity").style.display=id==="tabActivity"?"block":"none"; }
 
+async function notifyAssignment(ticketId){
+  try{
+    const {data,error}=await db.functions.invoke("notify-assignment",{body:{ticketId}});
+    if(error) return;
+    if(data && data.sent) toast("Assigned agent emailed ✓");
+  }catch(e){}
+}
 async function updateField(id,field,value){
   const {error}=await db.from("tickets").update({[field]:value}).eq("id",id);
   if(error){ toast(error.message,true); return; }
   toast("Updated ✓");
+  if(field==='assigned_agent_id' && value) notifyAssignment(id);
   await Promise.all([loadStats(),loadTickets()]);
   openDetail(id);
 }
