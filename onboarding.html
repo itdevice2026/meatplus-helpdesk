@@ -140,7 +140,7 @@
     </div>
     <div class="row2">
       <div class="field"><label>Position / title</label><input id="n_pos" placeholder="e.g. Accounting Staff"/></div>
-      <div class="field"><label>Department</label><input id="n_dept" placeholder="e.g. Finance"/></div>
+      <div class="field"><label>Department</label><select id="n_dept"><option value="">— Select department —</option></select></div>
     </div>
     <div class="row2">
       <div class="field"><label>Start date</label><input id="n_start" type="date"/></div>
@@ -170,6 +170,7 @@ let ME=null,ROLE=null,ITEMS=[],REQS=[];
 function toast(m,e){const t=$("#toast");t.textContent=m;t.className="toast show"+(e?" err":"");setTimeout(()=>t.className="toast",2600);}
 
 async function loadItems(){ const {data}=await db.from("onboarding_items").select("*").eq("active",true).order("sort").order("label"); ITEMS=data||[]; $("#n_items").innerHTML=ITEMS.map(i=>`<label class="chk"><input type="checkbox" value="${esc(i.label)}"> ${esc(i.label)}</label>`).join(""); }
+async function loadDepts(){ const {data}=await db.from("departments").select("name").eq("active",true).order("sort_order").order("name"); const sel=$("#n_dept"); if(sel&&data){ sel.innerHTML='<option value="">— Select department —</option>'+data.map(d=>`<option value="${esc(d.name)}">${esc(d.name)}</option>`).join(""); } }
 async function loadReqs(){
   const {data,error}=await db.from("onboarding_requests").select("*").order("created_at",{ascending:false});
   if(error){toast(error.message,true);return;}
@@ -265,7 +266,7 @@ async function enter(){
   $("#login").style.display="none"; $("#forcePw").style.display="none"; $("#noaccess").style.display="none"; $("#app").style.display="block";
   $("#meName").textContent=ME.name; $("#meAvatar").textContent=initials(ME.name); $("#meRole").textContent=ROLE;
   if(ROLE==="admin") $("#itLink").style.display="inline";
-  await loadItems(); await loadReqs();
+  await loadItems(); await loadDepts(); await loadReqs();
 }
 (async()=>{ const {data:{session}}=await db.auth.getSession(); if(session) start(); else $("#login").style.display="grid"; })();
 </script>

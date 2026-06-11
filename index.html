@@ -190,6 +190,7 @@
     <button class="btn ghost sm" id="onbBtn" style="display:none">📋 Onboarding</button>
     <button class="btn ghost sm" id="subjBtn" style="display:none">🏷 Subjects</button>
     <button class="btn ghost sm" id="urgBtn" style="display:none">⚡ Urgency</button>
+    <button class="btn ghost sm" id="deptBtn" style="display:none">🏢 Departments</button>
     <button class="btn ghost sm" id="adminBtn" style="display:none">⚙ Manage team</button>
     <div class="me"><span class="avatar" id="meAvatar"></span><span id="meName"></span><span class="rolebadge" id="meRole"></span></div>
     <button class="signout" id="pwBtn" title="Change your password">Change password</button>
@@ -302,6 +303,14 @@
   <div class="modal">
     <h2>⚡ Default urgency by category <button class="close" data-close>&times;</button></h2>
     <div class="body" id="urgBody"></div>
+  </div>
+</div>
+
+<!-- Admin: manage departments modal -->
+<div class="overlay" id="deptModal">
+  <div class="modal">
+    <h2>🏢 Manage departments <button class="close" data-close>&times;</button></h2>
+    <div class="body" id="deptBody"></div>
   </div>
 </div>
 
@@ -492,6 +501,54 @@ async function removeSubject(id){
   const {error}=await db.from("ticket_subjects").delete().eq("id",id);
   if(error){ toast(error.message,true); return; }
   await loadSubjects(); toast("Removed ✓"); openSubjects();
+}
+
+async function openDepts(){
+  $("#deptModal").classList.add("show");
+  $("#deptBody").innerHTML=`<div class="loading">Loading…</div>`;
+  const {data}=await db.from("departments").select("*").order("sort_order").order("name");
+  $("#deptBody").innerHTML=`
+    <style>
+      #deptBody .sin{width:100%;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit}
+      #deptBody .addbox{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:16px;display:flex;gap:8px}
+      #deptBody .srow{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+      #deptBody .srow .lbl{flex:1}
+      #deptBody .off{opacity:.5}
+    </style>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:10px">These appear as the Department choices on the HR onboarding form.</p>
+    <div class="addbox">
+      <input class="sin" id="dept_new" placeholder="Add a new department…" />
+      <button class="btn sm" onclick="addDept()">Add</button>
+    </div>
+    ${(data||[]).map(d=>`
+      <div class="srow ${d.active?'':'off'}">
+        <input class="sin lbl" value="${esc(d.name)}" onchange="renameDept('${d.id}',this.value)" />
+        <button class="btn ghost sm" onclick="toggleDept('${d.id}',${d.active?'false':'true'})">${d.active?'Hide':'Show'}</button>
+        <button class="btn danger sm" onclick="removeDept('${d.id}')">Remove</button>
+      </div>`).join("")}`;
+}
+async function addDept(){
+  const name=$("#dept_new").value.trim(); if(!name){ toast("Type a department first",true); return; }
+  const {error}=await db.from("departments").insert({name});
+  if(error){ toast(/duplicate|unique/i.test(error.message)?"That department already exists":error.message,true); return; }
+  toast("Department added ✓"); openDepts();
+}
+async function renameDept(id,name){
+  name=(name||"").trim(); if(!name){ openDepts(); return; }
+  const {error}=await db.from("departments").update({name}).eq("id",id);
+  if(error){ toast(/duplicate|unique/i.test(error.message)?"Another department already has that name":error.message,true); openDepts(); return; }
+  toast("Renamed ✓");
+}
+async function toggleDept(id,active){
+  const {error}=await db.from("departments").update({active}).eq("id",id);
+  if(error){ toast(error.message,true); return; }
+  toast(active?"Shown ✓":"Hidden ✓"); openDepts();
+}
+async function removeDept(id){
+  if(!confirm("Remove this department from the list? Existing requests keep their department; it just won't be offered as a future choice.")) return;
+  const {error}=await db.from("departments").delete().eq("id",id);
+  if(error){ toast(error.message,true); return; }
+  toast("Removed ✓"); openDepts();
 }
 
 async function loadStats(){
@@ -765,6 +822,7 @@ $("#createBtn").onclick=createTicket;
 $("#adminBtn").onclick=openAdmin;
 $("#subjBtn").onclick=openSubjects;
 $("#urgBtn").onclick=openUrgency;
+$("#deptBtn").onclick=openDepts;
 $("#onbBtn").onclick=openOnbBoard;
 $("#n_category").addEventListener("change",e=>{ const p=CATURG[e.target.value]; if(p) $("#n_priority").value=p; });
 ["search","fStatus","fPriority","fAgent"].forEach(id=>$("#"+id).addEventListener("input",render));
@@ -782,6 +840,7 @@ function applyRole(){
   $("#adminBtn").style.display = isAdmin() ? "" : "none";
   $("#subjBtn").style.display = isAdmin() ? "" : "none";
   $("#urgBtn").style.display = isAdmin() ? "" : "none";
+  $("#deptBtn").style.display = isAdmin() ? "" : "none";
   $("#onbBtn").style.display = "";
   $("#roBanner").style.display = ROLE==='manager' ? "block" : "none";
 }
