@@ -394,7 +394,7 @@ function openOnbDetail(id){
       <div><div class="k">Status</div>${statusSel}</div>
     </div>
     <div class="field"><label>IT items to provision ${ed?'(tick when done)':''}</label>
-      ${items.length?items.map((it,idx)=>`<label style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px"><input type="checkbox" ${it.done?'checked':''} ${ed?'':'disabled'} onchange="toggleOnbItem(${id},${idx})"> <span style="${it.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(it.label)}</span></label>`).join(""):'<div style="color:var(--muted)">No items specified.</div>'}
+      ${items.length?items.map((it,idx)=>`<label style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px"><input type="checkbox" ${it.done?'checked':''} ${ed?'':'disabled'} onchange="toggleOnbItem(${id},${idx})"> <span style="${it.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(it.label)}${it.value?' — <b>'+esc(it.value)+'</b>':''}</span></label>`).join(""):'<div style="color:var(--muted)">No items specified.</div>'}
     </div>
     ${r.notes?`<div class="field"><label>Notes from HR</label><div class="desc">${esc(r.notes)}</div></div>`:''}`;
   $("#onbDetailModal").classList.add("show");

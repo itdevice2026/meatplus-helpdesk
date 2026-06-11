@@ -142,6 +142,7 @@
       <div class="field"><label>Contact email (optional)</label><input id="n_email" type="email" placeholder="for IT to reach the new hire/you"/></div>
     </div>
     <div class="field"><label>IT tools / access needed</label><div class="checks" id="n_items"></div></div>
+    <div class="field"><label>Microsoft 365 license</label><select id="n_m365"><option value="">— Not needed —</option><option>Basic</option><option>Business Standard</option><option>Business Apps</option></select></div>
     <div class="field"><label>Notes (optional)</label><textarea id="n_notes" placeholder="Anything else IT should know…"></textarea></div>
     <div class="err" id="n_err"></div>
   </div>
@@ -183,7 +184,7 @@ async function loadReqs(){
     </tr>`;
   }).join("");
 }
-function openNew(){ ["n_name","n_pos","n_dept","n_start","n_email","n_notes"].forEach(i=>$("#"+i).value=""); $("#n_type").value="employee"; $("#n_err").textContent=""; document.querySelectorAll('#n_items input').forEach(c=>c.checked=false); $("#newModal").classList.add("show"); }
+function openNew(){ ["n_name","n_pos","n_dept","n_start","n_email","n_notes"].forEach(i=>$("#"+i).value=""); $("#n_type").value="employee"; $("#n_m365").value=""; $("#n_err").textContent=""; document.querySelectorAll('#n_items input').forEach(c=>c.checked=false); $("#newModal").classList.add("show"); }
 async function createReq(){
   const name=$("#n_name").value.trim(); $("#n_err").textContent="";
   if(!name){ $("#n_err").textContent="New hire name is required."; return; }
@@ -192,7 +193,8 @@ async function createReq(){
   const {data,error}=await db.rpc("submit_onboarding_request",{
     p_employee_name:name, p_employee_type:$("#n_type").value, p_position:$("#n_pos").value.trim(),
     p_department:$("#n_dept").value.trim(), p_start_date:$("#n_start").value||null,
-    p_contact_email:$("#n_email").value.trim(), p_items:items, p_notes:$("#n_notes").value.trim()
+    p_contact_email:$("#n_email").value.trim(), p_items:items, p_notes:$("#n_notes").value.trim(),
+    p_m365_license:$("#n_m365").value
   });
   btn.disabled=false; btn.textContent="Submit request";
   if(error){ $("#n_err").textContent=error.message; return; }
@@ -212,7 +214,7 @@ function openDetail(id){
       <div><div class="k">Requested by</div>${esc(r.requested_by_name||'—')}</div>
     </div>
     <div class="field"><label>IT tools / access requested</label>
-      ${items.length?items.map(it=>`<div class="itemrow ${it.done?'done':''}"><span class="dot">${it.done?'✓':''}</span><span class="lbl">${esc(it.label)}</span></div>`).join(""):'<div style="color:var(--muted)">None specified.</div>'}
+      ${items.length?items.map(it=>`<div class="itemrow ${it.done?'done':''}"><span class="dot">${it.done?'✓':''}</span><span class="lbl">${esc(it.label)}${it.value?' — '+esc(it.value):''}</span></div>`).join(""):'<div style="color:var(--muted)">None specified.</div>'}
     </div>
     ${r.notes?`<div class="field"><label>Notes</label><div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px;white-space:pre-wrap;line-height:1.5;color:#cdd6df">${esc(r.notes)}</div></div>`:''}
     <p style="color:var(--muted);font-size:12px">IT updates progress on their side — check back here to see items completed and status change.</p>`;
