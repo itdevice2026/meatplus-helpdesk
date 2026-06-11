@@ -56,6 +56,9 @@
   .s-pending{background:rgba(245,158,11,.15);color:#fbbf24}
   .s-resolved{background:rgba(34,197,94,.15);color:#4ade80}
   .s-closed{background:rgba(139,152,165,.15);color:#9aa6b2}
+  .s-new{background:rgba(59,130,246,.15);color:#60a5fa}
+  .s-completed{background:rgba(34,197,94,.15);color:#4ade80}
+  .s-cancelled{background:rgba(139,152,165,.15);color:#9aa6b2}
   .p-low{color:#9aa6b2}.p-medium{color:#60a5fa}.p-high{color:#fbbf24}.p-urgent{color:#f87171}
   .prio{font-weight:600;text-transform:capitalize;display:inline-flex;align-items:center;gap:5px}
   .prio::before{content:"";width:7px;height:7px;border-radius:2px;background:currentColor;transform:rotate(45deg)}
@@ -181,6 +184,7 @@
     <span class="sub" style="font-size:14px">IT Helpdesk · Ticketing System</span>
   </div>
   <div class="who">
+    <button class="btn ghost sm" id="onbBtn" style="display:none">📋 Onboarding</button>
     <button class="btn ghost sm" id="subjBtn" style="display:none">🏷 Subjects</button>
     <button class="btn ghost sm" id="urgBtn" style="display:none">⚡ Urgency</button>
     <button class="btn ghost sm" id="adminBtn" style="display:none">⚙ Manage team</button>
@@ -262,6 +266,26 @@
   </div>
 </div>
 
+<!-- Onboarding board -->
+<div class="overlay" id="onbModal">
+  <div class="modal" style="max-width:840px">
+    <h2>📋 Onboarding requests <button class="close" data-close>&times;</button></h2>
+    <div class="body" id="onbBody"></div>
+  </div>
+</div>
+<div class="overlay" id="onbDetailModal">
+  <div class="modal">
+    <h2><span id="onbd_num" class="tn"></span> <button class="close" data-close>&times;</button></h2>
+    <div class="body" id="onbDetailBody"></div>
+  </div>
+</div>
+<div class="overlay" id="onbItemsModal">
+  <div class="modal">
+    <h2>🧰 Onboarding checklist items <button class="close" data-close>&times;</button></h2>
+    <div class="body" id="onbItemsBody"></div>
+  </div>
+</div>
+
 <!-- Admin: manage subjects modal -->
 <div class="overlay" id="subjModal">
   <div class="modal">
@@ -336,6 +360,74 @@ async function setUrgency(cat,priority){
   if(error){ toast(error.message,true); return; }
   CATURG[cat]=priority; toast("Updated ✓");
 }
+
+/* ---- Onboarding board (IT side) ---- */
+let ONB=[];
+const onbDate=d=>d?new Date(d).toLocaleDateString([], {year:"numeric",month:"short",day:"numeric"}):"—";
+async function openOnbBoard(){
+  $("#onbModal").classList.add("show");
+  $("#onbBody").innerHTML=`<div class="loading">Loading…</div>`;
+  const {data,error}=await db.from("onboarding_requests").select("*").order("created_at",{ascending:false});
+  if(error){ $("#onbBody").innerHTML=`<div class="empty">${esc(error.message)}</div>`; return; }
+  ONB=data||[];
+  const mItems=isAdmin()?`<button class="btn ghost sm" onclick="openOnbItems()">🧰 Manage items</button>`:'';
+  $("#onbBody").innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div style="color:var(--muted);font-size:13px;flex:1">Requests from HR for new-hire / intern IT setup.</div>${mItems}</div>
+    ${ONB.length?`<table style="width:100%;border-collapse:collapse">
+      <thead><tr><th>#</th><th>New hire</th><th>Type</th><th>Dept</th><th>Start</th><th>Items</th><th>Status</th></tr></thead>
+      <tbody>${ONB.map(r=>{const it=Array.isArray(r.items)?r.items:[];const dn=it.filter(x=>x.done).length;return `<tr style="cursor:pointer" onclick="openOnbDetail(${r.id})"><td><span class="tn">${esc(r.request_number)}</span></td><td>${esc(r.employee_name)}</td><td style="text-transform:capitalize">${esc(r.employee_type)}</td><td>${esc(r.department||'—')}</td><td>${onbDate(r.start_date)}</td><td style="color:var(--muted)">${dn}/${it.length}</td><td><span class="pill s-${r.status}">${r.status.replace("_"," ")}</span></td></tr>`;}).join("")}</tbody></table>`
+    :`<div class="empty">No onboarding requests yet.</div>`}`;
+}
+function openOnbDetail(id){
+  const r=ONB.find(x=>x.id===id); if(!r) return;
+  $("#onbd_num").textContent=r.request_number;
+  const items=Array.isArray(r.items)?r.items:[]; const ed=canEdit();
+  const statusSel = ed?`<select onchange="setOnbStatus(${id},this.value)">${["new","in_progress","completed","cancelled"].map(s=>`<option ${r.status===s?"selected":""}>${s}</option>`).join("")}</select>`:`<div class="ro">${r.status.replace("_"," ")}</div>`;
+  $("#onbDetailBody").innerHTML=`
+    <div class="dt-head"><h3 style="font-size:17px">${esc(r.employee_name)}</h3><span style="text-transform:capitalize;color:var(--muted)">${esc(r.employee_type)}</span></div>
+    <div class="dt-meta">
+      <div><div class="k">Position</div><div class="ro">${esc(r.position||'—')}</div></div>
+      <div><div class="k">Department</div><div class="ro">${esc(r.department||'—')}</div></div>
+      <div><div class="k">Start date</div><div class="ro" style="text-transform:none">${onbDate(r.start_date)}</div></div>
+      <div><div class="k">Contact</div><div class="ro" style="text-transform:none">${esc(r.contact_email||'—')}</div></div>
+      <div><div class="k">Requested by</div><div class="ro">${esc(r.requested_by_name||'—')}</div></div>
+      <div><div class="k">Status</div>${statusSel}</div>
+    </div>
+    <div class="field"><label>IT items to provision ${ed?'(tick when done)':''}</label>
+      ${items.length?items.map((it,idx)=>`<label style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px"><input type="checkbox" ${it.done?'checked':''} ${ed?'':'disabled'} onchange="toggleOnbItem(${id},${idx})"> <span style="${it.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(it.label)}</span></label>`).join(""):'<div style="color:var(--muted)">No items specified.</div>'}
+    </div>
+    ${r.notes?`<div class="field"><label>Notes from HR</label><div class="desc">${esc(r.notes)}</div></div>`:''}`;
+  $("#onbDetailModal").classList.add("show");
+}
+async function setOnbStatus(id,status){
+  const {error}=await db.from("onboarding_requests").update({status}).eq("id",id);
+  if(error){ toast(error.message,true); return; }
+  const r=ONB.find(x=>x.id===id); if(r) r.status=status;
+  toast("Status updated ✓");
+}
+async function toggleOnbItem(id,idx){
+  const r=ONB.find(x=>x.id===id); if(!r) return;
+  const items=JSON.parse(JSON.stringify(Array.isArray(r.items)?r.items:[]));
+  if(!items[idx]) return; items[idx].done=!items[idx].done;
+  const {error}=await db.from("onboarding_requests").update({items}).eq("id",id);
+  if(error){ toast(error.message,true); return; }
+  r.items=items; openOnbDetail(id);
+}
+async function openOnbItems(){
+  $("#onbItemsModal").classList.add("show");
+  $("#onbItemsBody").innerHTML=`<div class="loading">Loading…</div>`;
+  const {data}=await db.from("onboarding_items").select("*").order("sort").order("label");
+  $("#onbItemsBody").innerHTML=`
+    <p style="color:var(--muted);font-size:13px;margin-bottom:10px">These are the IT-setup options HR can tick on an onboarding request.</p>
+    <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px;display:flex;gap:8px">
+      <input id="oi_new" placeholder="Add an item…" style="flex:1;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px"/>
+      <button class="btn sm" onclick="addOnbItem()">Add</button></div>
+    ${(data||[]).map(it=>`<div class="agentrow ${it.active?'':'inactive'}"><input value="${esc(it.label)}" onchange="renameOnbItem(${it.id},this.value)" style="flex:1;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:13px"/><button class="btn ghost sm" onclick="toggleOnbItemActive(${it.id},${it.active?'false':'true'})">${it.active?'Hide':'Show'}</button><button class="btn danger sm" onclick="removeOnbItem(${it.id})">Remove</button></div>`).join("")}`;
+}
+async function addOnbItem(){ const label=$("#oi_new").value.trim(); if(!label){toast("Type an item first",true);return;} const {error}=await db.from("onboarding_items").insert({label}); if(error){toast(/dup|unique/i.test(error.message)?"That item already exists":error.message,true);return;} toast("Item added ✓"); openOnbItems(); }
+async function renameOnbItem(id,label){ label=(label||"").trim(); if(!label){openOnbItems();return;} const {error}=await db.from("onboarding_items").update({label}).eq("id",id); toast(error?error.message:"Renamed ✓",!!error); }
+async function toggleOnbItemActive(id,active){ const {error}=await db.from("onboarding_items").update({active}).eq("id",id); if(!error)openOnbItems(); toast(error?error.message:"Updated ✓",!!error); }
+async function removeOnbItem(id){ if(!confirm("Remove this item from the checklist?"))return; const {error}=await db.from("onboarding_items").delete().eq("id",id); if(error){toast(error.message,true);return;} toast("Removed ✓"); openOnbItems(); }
 
 let SUBJECTS=[];
 async function loadSubjects(){
@@ -605,7 +697,7 @@ async function openAdmin(){
         <input class="am-in" id="am_email" placeholder="email@meatplus.ph" />
       </div>
       <div class="g2">
-        <select class="am-in" id="am_role"><option value="agent">Agent</option><option value="manager">Manager</option><option value="admin">Admin</option></select>
+        <select class="am-in" id="am_role"><option value="agent">Agent</option><option value="manager">Manager</option><option value="hr">HR</option><option value="admin">Admin</option></select>
         <input class="am-in" id="am_pw" type="text" placeholder="Temp password (new logins only)" />
       </div>
       <button class="btn sm" id="am_btn" onclick="addMember()">Add member</button>
@@ -618,7 +710,7 @@ async function openAdmin(){
         <span class="avatar">${initials(a.name)}</span>
         <div style="flex:1"><div class="nm">${esc(a.name)}${a.active?'':' <span style="color:var(--muted);font-weight:400">(disabled)</span>'}</div><div class="em">${esc(a.email)}</div></div>
         <select class="role" onchange="setAgentRole('${a.id}',this.value)" ${a.user_id?'':'disabled title="No login linked"'}>
-          ${["admin","agent","manager"].map(r=>`<option value="${r}" ${a.role===r?"selected":""}>${r}</option>`).join("")}
+          ${["admin","agent","manager","hr"].map(r=>`<option value="${r}" ${a.role===r?"selected":""}>${r}</option>`).join("")}
         </select>
         <button class="btn ghost sm" onclick="setAgentActive('${a.id}',${a.active?'false':'true'})">${a.active?'Disable':'Enable'}</button>
         <button class="btn danger sm" onclick="removeMember('${a.id}','${esc(a.name).replace(/'/g,"")}')">Remove</button>
@@ -664,6 +756,7 @@ $("#createBtn").onclick=createTicket;
 $("#adminBtn").onclick=openAdmin;
 $("#subjBtn").onclick=openSubjects;
 $("#urgBtn").onclick=openUrgency;
+$("#onbBtn").onclick=openOnbBoard;
 $("#n_category").addEventListener("change",e=>{ const p=CATURG[e.target.value]; if(p) $("#n_priority").value=p; });
 ["search","fStatus","fPriority","fAgent"].forEach(id=>$("#"+id).addEventListener("input",render));
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>b.closest(".overlay").classList.remove("show"));
@@ -680,6 +773,7 @@ function applyRole(){
   $("#adminBtn").style.display = isAdmin() ? "" : "none";
   $("#subjBtn").style.display = isAdmin() ? "" : "none";
   $("#urgBtn").style.display = isAdmin() ? "" : "none";
+  $("#onbBtn").style.display = "";
   $("#roBanner").style.display = ROLE==='manager' ? "block" : "none";
 }
 async function startApp(){
@@ -690,6 +784,7 @@ async function startApp(){
     window._db = db; return;
   }
   ME = me; ROLE = me.role;
+  if(ROLE==='hr'){ location.replace('onboarding.html'); return; }
   if(me.must_change_password){ $("#login").style.display="none"; $("#forcePw").style.display="grid"; setTimeout(()=>$("#fp_new").focus(),60); return; }
   await enterApp();
 }

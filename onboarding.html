@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HR Onboarding Portal · MeatPlus IT</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{--bg:#0f1419;--panel:#1a212b;--panel2:#222c38;--line:#2d3845;--txt:#e6edf3;--muted:#8b98a5;--accent:#3b82f6;--accent2:#2563eb;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--purple:#a855f7;--cyan:#06b6d4;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:14px 22px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:50}
+  .mp-badge{background:#fff;border-radius:10px;padding:6px 13px;display:inline-flex;align-items:center}
+  .mp-badge img{display:block;height:34px;width:auto}
+  header .sub{color:var(--muted);font-size:13px}
+  header .who{margin-left:auto;display:flex;align-items:center;gap:12px;color:var(--muted);font-size:13px}
+  .avatar{width:26px;height:26px;border-radius:50%;background:var(--accent2);display:inline-grid;place-items:center;font-size:11px;font-weight:600;color:#fff}
+  .rolebadge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 8px;border-radius:6px;background:rgba(6,182,212,.18);color:#22d3ee}
+  .lnk{cursor:pointer;color:var(--muted);background:none;border:none;font-size:13px;text-decoration:underline}
+  .wrap{max-width:1100px;margin:0 auto;padding:22px}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 15px;font-size:13px;font-weight:600;cursor:pointer}
+  .btn:hover{background:var(--accent2)} .btn:disabled{opacity:.6;cursor:default}
+  .btn.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--txt)}
+  .toolbar{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .toolbar h2{font-size:18px} .toolbar .sp{flex:1}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);font-size:13px}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;background:var(--panel2)}
+  tbody tr{cursor:pointer} tbody tr:hover{background:var(--panel2)}
+  .tn{font-family:ui-monospace,monospace;color:var(--muted);font-size:12px}
+  .typ{font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px}
+  .t-employee{background:rgba(59,130,246,.15);color:#60a5fa}.t-intern{background:rgba(168,85,247,.15);color:#c084fc}
+  .pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:600;text-transform:capitalize;white-space:nowrap}
+  .pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+  .s-new{background:rgba(59,130,246,.15);color:#60a5fa}.s-in_progress{background:rgba(168,85,247,.15);color:#c084fc}.s-completed{background:rgba(34,197,94,.15);color:#4ade80}.s-cancelled{background:rgba(139,152,165,.15);color:#9aa6b2}
+  .prog{color:var(--muted);font-size:12px}
+  .empty{padding:50px;text-align:center;color:var(--muted)}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:100;align-items:flex-start;justify-content:center;padding:30px;overflow:auto}
+  .overlay.show{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;width:100%;max-width:640px}
+  .modal h3{padding:18px 22px;border-bottom:1px solid var(--line);font-size:16px;display:flex;align-items:center;gap:10px}
+  .modal .close{margin-left:auto;cursor:pointer;color:var(--muted);font-size:22px;background:none;border:none}
+  .modal .body{padding:22px;max-height:72vh;overflow:auto}
+  .modal .foot{padding:16px 22px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end}
+  .field{margin-bottom:14px}
+  .field label{display:block;color:var(--muted);font-size:12px;margin-bottom:5px;font-weight:600}
+  .field input,.field select,.field textarea{width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit}
+  .field textarea{min-height:70px;resize:vertical}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .checks{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .chk{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:13px;cursor:pointer}
+  .chk input{width:16px;height:16px}
+  .err{color:var(--red);font-size:13px;min-height:18px}
+  .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+  .meta .k{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
+  .itemrow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px}
+  .itemrow .dot{width:16px;height:16px;border-radius:4px;border:1px solid var(--line);display:inline-grid;place-items:center;font-size:11px}
+  .itemrow.done .dot{background:var(--green);border-color:var(--green);color:#04210f}
+  .itemrow.done .lbl{color:var(--muted);text-decoration:line-through}
+  .toast{position:fixed;bottom:22px;right:22px;background:var(--green);color:#04210f;padding:11px 16px;border-radius:9px;font-weight:600;font-size:13px;z-index:200;opacity:0;transform:translateY(10px);transition:.2s}
+  .toast.show{opacity:1;transform:none}.toast.err{background:var(--red);color:#fff}
+  /* login / states */
+  #login,#forcePw,#noaccess{position:fixed;inset:0;background:radial-gradient(circle at 30% 20%,#172033,#0f1419);display:none;place-items:center;z-index:300}
+  .lbox{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:34px;width:100%;max-width:390px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+  .lbox .brand{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .lbox h2{font-size:18px;margin-bottom:4px}
+  .lbox p.sub{color:var(--muted);font-size:13px;margin-bottom:20px;line-height:1.5}
+  .lbox label{display:block;color:var(--muted);font-size:12px;margin-bottom:5px;font-weight:600}
+  .lbox input{width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:11px 13px;font-size:14px;margin-bottom:14px}
+  .lbox .btn{width:100%;padding:12px;font-size:14px}
+  .lbox .so{display:block;text-align:center;margin-top:12px}
+  #app{display:none}
+</style>
+</head>
+<body>
+
+<div id="login"><div class="lbox">
+  <div class="brand"><span class="mp-badge"><img src="logo.png" alt="MeatPlus"/></span></div>
+  <h2>HR Onboarding Portal</h2>
+  <p class="sub">Sign in with your HR account to request IT setup for new hires.</p>
+  <label>Email</label><input id="li_email" type="email" placeholder="name@meatplus.ph" autocomplete="username"/>
+  <label>Password</label><input id="li_pw" type="password" placeholder="••••••••" autocomplete="current-password"/>
+  <button class="btn" id="li_btn">Sign in</button>
+  <div class="err" id="li_err" style="margin-top:10px"></div>
+</div></div>
+
+<div id="forcePw"><div class="lbox">
+  <h2>🔑 Set your password</h2>
+  <p class="sub">First sign-in with a temporary password. Please choose your own to continue.</p>
+  <label>New password</label><input id="fp_new" type="password" placeholder="At least 8 characters"/>
+  <label>Confirm</label><input id="fp_confirm" type="password" placeholder="Re-enter new password"/>
+  <button class="btn" id="fp_btn">Set password &amp; continue</button>
+  <div class="err" id="fp_err" style="margin-top:10px"></div>
+  <button class="lnk so" id="fp_signout">Sign out</button>
+</div></div>
+
+<div id="noaccess"><div class="lbox" style="text-align:center">
+  <h2>This portal is for HR</h2>
+  <p class="sub" id="na_msg">Your account doesn't have HR access to the onboarding portal.</p>
+  <a class="btn" href="index.html" style="display:inline-block;text-decoration:none">Go to IT Helpdesk</a>
+  <button class="lnk so" id="na_signout">Sign out</button>
+</div></div>
+
+<div id="app">
+<header>
+  <span class="mp-badge"><img src="logo.png" alt="MeatPlus"/></span>
+  <span class="sub">HR Onboarding Portal</span>
+  <div class="who">
+    <a class="lnk" id="itLink" href="index.html" style="display:none">IT Helpdesk</a>
+    <span class="avatar" id="meAvatar"></span><span id="meName"></span><span class="rolebadge" id="meRole"></span>
+    <button class="lnk" id="pwBtn" title="Change password">Change password</button>
+    <button class="lnk" id="signoutBtn">Sign out</button>
+  </div>
+</header>
+<div class="wrap">
+  <div class="toolbar">
+    <h2>Onboarding requests</h2><div class="sp"></div>
+    <button class="btn" id="newBtn">+ New onboarding request</button>
+  </div>
+  <div class="card"><table>
+    <thead><tr><th>#</th><th>New hire</th><th>Type</th><th>Department</th><th>Start date</th><th>IT items</th><th>Status</th><th>Requested</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+  </table></div>
+</div>
+</div>
+
+<!-- New request modal -->
+<div class="overlay" id="newModal"><div class="modal">
+  <h3>🧑‍💼 New onboarding request <button class="close" data-close>&times;</button></h3>
+  <div class="body">
+    <div class="row2">
+      <div class="field"><label>New hire full name *</label><input id="n_name" placeholder="Full name"/></div>
+      <div class="field"><label>Type</label><select id="n_type"><option value="employee">Employee</option><option value="intern">Intern</option></select></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Position / title</label><input id="n_pos" placeholder="e.g. Accounting Staff"/></div>
+      <div class="field"><label>Department</label><input id="n_dept" placeholder="e.g. Finance"/></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Start date</label><input id="n_start" type="date"/></div>
+      <div class="field"><label>Contact email (optional)</label><input id="n_email" type="email" placeholder="for IT to reach the new hire/you"/></div>
+    </div>
+    <div class="field"><label>IT tools / access needed</label><div class="checks" id="n_items"></div></div>
+    <div class="field"><label>Notes (optional)</label><textarea id="n_notes" placeholder="Anything else IT should know…"></textarea></div>
+    <div class="err" id="n_err"></div>
+  </div>
+  <div class="foot"><button class="btn ghost" data-close>Cancel</button><button class="btn" id="createBtn">Submit request</button></div>
+</div></div>
+
+<!-- Detail modal -->
+<div class="overlay" id="detailModal"><div class="modal"><h3><span id="d_num" class="tn"></span><button class="close" data-close>&times;</button></h3><div class="body" id="detailBody"></div></div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const db=supabase.createClient("https://emkcwukiqxnvcbhkjiqz.supabase.co","sb_publishable_u_qnmEI8oHI9Z_A0-Hht3Q_Yvaa7Ork");
+const $=s=>document.querySelector(s);
+const esc=s=>(s??"").toString().replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const initials=n=>(n||"?").split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();
+const fmtD=d=>d?new Date(d).toLocaleDateString([], {year:"numeric",month:"short",day:"numeric"}):"—";
+const ago=d=>{if(!d)return"—";const s=(Date.now()-new Date(d))/1e3;if(s<3600)return Math.floor(s/60)+"m ago";if(s<86400)return Math.floor(s/3600)+"h ago";if(s<2592000)return Math.floor(s/86400)+"d ago";return new Date(d).toLocaleDateString();};
+let ME=null,ROLE=null,ITEMS=[],REQS=[];
+function toast(m,e){const t=$("#toast");t.textContent=m;t.className="toast show"+(e?" err":"");setTimeout(()=>t.className="toast",2600);}
+
+async function loadItems(){ const {data}=await db.from("onboarding_items").select("*").eq("active",true).order("sort").order("label"); ITEMS=data||[]; $("#n_items").innerHTML=ITEMS.map(i=>`<label class="chk"><input type="checkbox" value="${esc(i.label)}"> ${esc(i.label)}</label>`).join(""); }
+async function loadReqs(){
+  const {data,error}=await db.from("onboarding_requests").select("*").order("created_at",{ascending:false});
+  if(error){toast(error.message,true);return;}
+  REQS=data||[];
+  if(!REQS.length){ $("#rows").innerHTML=`<tr><td colspan="8" class="empty">No onboarding requests yet. Click “New onboarding request”.</td></tr>`; return; }
+  $("#rows").innerHTML=REQS.map(r=>{
+    const items=Array.isArray(r.items)?r.items:[]; const done=items.filter(x=>x.done).length;
+    return `<tr onclick="openDetail(${r.id})">
+      <td><span class="tn">${esc(r.request_number)}</span></td>
+      <td>${esc(r.employee_name)}${r.position?`<div style="color:var(--muted);font-size:11px">${esc(r.position)}</div>`:''}</td>
+      <td><span class="typ t-${r.employee_type}">${r.employee_type}</span></td>
+      <td>${esc(r.department||'—')}</td>
+      <td>${fmtD(r.start_date)}</td>
+      <td class="prog">${done}/${items.length} done</td>
+      <td><span class="pill s-${r.status}">${r.status.replace("_"," ")}</span></td>
+      <td style="color:var(--muted)">${esc(r.requested_by_name||'')}<div style="font-size:11px">${ago(r.created_at)}</div></td>
+    </tr>`;
+  }).join("");
+}
+function openNew(){ ["n_name","n_pos","n_dept","n_start","n_email","n_notes"].forEach(i=>$("#"+i).value=""); $("#n_type").value="employee"; $("#n_err").textContent=""; document.querySelectorAll('#n_items input').forEach(c=>c.checked=false); $("#newModal").classList.add("show"); }
+async function createReq(){
+  const name=$("#n_name").value.trim(); $("#n_err").textContent="";
+  if(!name){ $("#n_err").textContent="New hire name is required."; return; }
+  const items=[...document.querySelectorAll('#n_items input:checked')].map(c=>c.value);
+  const btn=$("#createBtn"); btn.disabled=true; btn.textContent="Submitting…";
+  const {data,error}=await db.rpc("submit_onboarding_request",{
+    p_employee_name:name, p_employee_type:$("#n_type").value, p_position:$("#n_pos").value.trim(),
+    p_department:$("#n_dept").value.trim(), p_start_date:$("#n_start").value||null,
+    p_contact_email:$("#n_email").value.trim(), p_items:items, p_notes:$("#n_notes").value.trim()
+  });
+  btn.disabled=false; btn.textContent="Submit request";
+  if(error){ $("#n_err").textContent=error.message; return; }
+  $("#newModal").classList.remove("show"); toast("Request "+data+" submitted ✓"); loadReqs();
+}
+function openDetail(id){
+  const r=REQS.find(x=>x.id===id); if(!r) return;
+  $("#d_num").textContent=r.request_number;
+  const items=Array.isArray(r.items)?r.items:[];
+  $("#detailBody").innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><h3 style="font-size:17px">${esc(r.employee_name)}</h3><span class="typ t-${r.employee_type}">${r.employee_type}</span><span class="pill s-${r.status}" style="margin-left:auto">${r.status.replace("_"," ")}</span></div>
+    <div class="meta">
+      <div><div class="k">Position</div>${esc(r.position||'—')}</div>
+      <div><div class="k">Department</div>${esc(r.department||'—')}</div>
+      <div><div class="k">Start date</div>${fmtD(r.start_date)}</div>
+      <div><div class="k">Contact</div>${esc(r.contact_email||'—')}</div>
+      <div><div class="k">Requested by</div>${esc(r.requested_by_name||'—')}</div>
+    </div>
+    <div class="field"><label>IT tools / access requested</label>
+      ${items.length?items.map(it=>`<div class="itemrow ${it.done?'done':''}"><span class="dot">${it.done?'✓':''}</span><span class="lbl">${esc(it.label)}</span></div>`).join(""):'<div style="color:var(--muted)">None specified.</div>'}
+    </div>
+    ${r.notes?`<div class="field"><label>Notes</label><div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px;white-space:pre-wrap;line-height:1.5;color:#cdd6df">${esc(r.notes)}</div></div>`:''}
+    <p style="color:var(--muted);font-size:12px">IT updates progress on their side — check back here to see items completed and status change.</p>`;
+  $("#detailModal").classList.add("show");
+}
+
+/* change password */
+$("#pwBtn")&&($("#pwBtn").onclick=async()=>{ const np=prompt("Enter a new password (at least 8 characters):"); if(np===null)return; if(np.length<8){toast("Password must be at least 8 characters",true);return;} const {error}=await db.auth.updateUser({password:np}); if(error){toast(error.message,true);return;} await db.rpc("mark_password_changed"); toast("Password updated ✓"); });
+
+/* wire */
+$("#newBtn").onclick=openNew; $("#createBtn").onclick=createReq;
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>b.closest(".overlay").classList.remove("show"));
+document.querySelectorAll(".overlay").forEach(o=>o.onclick=e=>{if(e.target===o)o.classList.remove("show");});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")document.querySelectorAll(".overlay.show").forEach(o=>o.classList.remove("show"));});
+$("#signoutBtn").onclick=async()=>{await db.auth.signOut();location.reload();};
+$("#na_signout").onclick=async()=>{await db.auth.signOut();location.reload();};
+$("#fp_signout").onclick=async()=>{await db.auth.signOut();location.reload();};
+
+/* auth */
+async function doLogin(){ const email=$("#li_email").value.trim(),pw=$("#li_pw").value; $("#li_err").textContent=""; if(!email||!pw){$("#li_err").textContent="Enter email and password.";return;} $("#li_btn").textContent="Signing in…";$("#li_btn").disabled=true; const {error}=await db.auth.signInWithPassword({email,password:pw}); $("#li_btn").textContent="Sign in";$("#li_btn").disabled=false; if(error){$("#li_err").textContent=error.message;return;} start(); }
+$("#li_btn").onclick=doLogin; $("#li_pw").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin();});
+$("#fp_btn").onclick=async()=>{ const a=$("#fp_new").value,b=$("#fp_confirm").value; $("#fp_err").textContent=""; if(a.length<8){$("#fp_err").textContent="At least 8 characters.";return;} if(a!==b){$("#fp_err").textContent="Passwords don't match.";return;} const {error}=await db.auth.updateUser({password:a}); if(error){$("#fp_err").textContent=error.message;return;} await db.rpc("mark_password_changed"); if(ME)ME.must_change_password=false; $("#forcePw").style.display="none"; enter(); };
+
+async function start(){
+  const {data:{user}}=await db.auth.getUser();
+  if(!user){ $("#login").style.display="grid"; return; }
+  const {data:me}=await db.from("ticket_agents").select("*").eq("user_id",user.id).maybeSingle();
+  if(!me||!me.active||!["hr","admin"].includes(me.role)){ $("#login").style.display="none"; $("#na_msg").textContent = me?("Signed in as "+me.email+" ("+me.role+"). The onboarding portal is for HR (or admins)."):"Your account isn't set up for the onboarding portal. Contact IT."; $("#noaccess").style.display="grid"; return; }
+  ME=me; ROLE=me.role;
+  if(me.must_change_password){ $("#login").style.display="none"; $("#forcePw").style.display="grid"; setTimeout(()=>$("#fp_new").focus(),60); return; }
+  enter();
+}
+async function enter(){
+  $("#login").style.display="none"; $("#forcePw").style.display="none"; $("#noaccess").style.display="none"; $("#app").style.display="block";
+  $("#meName").textContent=ME.name; $("#meAvatar").textContent=initials(ME.name); $("#meRole").textContent=ROLE;
+  if(ROLE==="admin") $("#itLink").style.display="inline";
+  await loadItems(); await loadReqs();
+}
+(async()=>{ const {data:{session}}=await db.auth.getSession(); if(session) start(); else $("#login").style.display="grid"; })();
+</script>
+</body>
+</html>
