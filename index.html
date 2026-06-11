@@ -191,6 +191,7 @@
     <button class="btn ghost sm" id="subjBtn" style="display:none">🏷 Subjects</button>
     <button class="btn ghost sm" id="urgBtn" style="display:none">⚡ Urgency</button>
     <button class="btn ghost sm" id="deptBtn" style="display:none">🏢 Departments</button>
+    <button class="btn ghost sm" id="posBtn" style="display:none">🧑‍💼 Positions</button>
     <button class="btn ghost sm" id="adminBtn" style="display:none">⚙ Manage team</button>
     <div class="me"><span class="avatar" id="meAvatar"></span><span id="meName"></span><span class="rolebadge" id="meRole"></span></div>
     <button class="signout" id="pwBtn" title="Change your password">Change password</button>
@@ -311,6 +312,14 @@
   <div class="modal">
     <h2>🏢 Manage departments <button class="close" data-close>&times;</button></h2>
     <div class="body" id="deptBody"></div>
+  </div>
+</div>
+
+<!-- Admin: manage positions modal -->
+<div class="overlay" id="posModal">
+  <div class="modal">
+    <h2>🧑‍💼 Manage positions / titles <button class="close" data-close>&times;</button></h2>
+    <div class="body" id="posBody"></div>
   </div>
 </div>
 
@@ -549,6 +558,54 @@ async function removeDept(id){
   const {error}=await db.from("departments").delete().eq("id",id);
   if(error){ toast(error.message,true); return; }
   toast("Removed ✓"); openDepts();
+}
+
+async function openPositions(){
+  $("#posModal").classList.add("show");
+  $("#posBody").innerHTML=`<div class="loading">Loading…</div>`;
+  const {data}=await db.from("positions").select("*").order("sort_order").order("name");
+  $("#posBody").innerHTML=`
+    <style>
+      #posBody .sin{width:100%;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit}
+      #posBody .addbox{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:16px;display:flex;gap:8px}
+      #posBody .srow{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+      #posBody .srow .lbl{flex:1}
+      #posBody .off{opacity:.5}
+    </style>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:10px">These appear as the Position / title choices on the HR onboarding form.</p>
+    <div class="addbox">
+      <input class="sin" id="pos_new" placeholder="Add a new position…" />
+      <button class="btn sm" onclick="addPosition()">Add</button>
+    </div>
+    ${(data||[]).map(p=>`
+      <div class="srow ${p.active?'':'off'}">
+        <input class="sin lbl" value="${esc(p.name)}" onchange="renamePosition('${p.id}',this.value)" />
+        <button class="btn ghost sm" onclick="togglePosition('${p.id}',${p.active?'false':'true'})">${p.active?'Hide':'Show'}</button>
+        <button class="btn danger sm" onclick="removePosition('${p.id}')">Remove</button>
+      </div>`).join("")}`;
+}
+async function addPosition(){
+  const name=$("#pos_new").value.trim(); if(!name){ toast("Type a position first",true); return; }
+  const {error}=await db.from("positions").insert({name});
+  if(error){ toast(/duplicate|unique/i.test(error.message)?"That position already exists":error.message,true); return; }
+  toast("Position added ✓"); openPositions();
+}
+async function renamePosition(id,name){
+  name=(name||"").trim(); if(!name){ openPositions(); return; }
+  const {error}=await db.from("positions").update({name}).eq("id",id);
+  if(error){ toast(/duplicate|unique/i.test(error.message)?"Another position already has that name":error.message,true); openPositions(); return; }
+  toast("Renamed ✓");
+}
+async function togglePosition(id,active){
+  const {error}=await db.from("positions").update({active}).eq("id",id);
+  if(error){ toast(error.message,true); return; }
+  toast(active?"Shown ✓":"Hidden ✓"); openPositions();
+}
+async function removePosition(id){
+  if(!confirm("Remove this position from the list? Existing requests keep their position; it just won't be offered as a future choice.")) return;
+  const {error}=await db.from("positions").delete().eq("id",id);
+  if(error){ toast(error.message,true); return; }
+  toast("Removed ✓"); openPositions();
 }
 
 async function loadStats(){
@@ -823,6 +880,7 @@ $("#adminBtn").onclick=openAdmin;
 $("#subjBtn").onclick=openSubjects;
 $("#urgBtn").onclick=openUrgency;
 $("#deptBtn").onclick=openDepts;
+$("#posBtn").onclick=openPositions;
 $("#onbBtn").onclick=openOnbBoard;
 $("#n_category").addEventListener("change",e=>{ const p=CATURG[e.target.value]; if(p) $("#n_priority").value=p; });
 ["search","fStatus","fPriority","fAgent"].forEach(id=>$("#"+id).addEventListener("input",render));
@@ -841,6 +899,7 @@ function applyRole(){
   $("#subjBtn").style.display = isAdmin() ? "" : "none";
   $("#urgBtn").style.display = isAdmin() ? "" : "none";
   $("#deptBtn").style.display = isAdmin() ? "" : "none";
+  $("#posBtn").style.display = isAdmin() ? "" : "none";
   $("#onbBtn").style.display = "";
   $("#roBanner").style.display = ROLE==='manager' ? "block" : "none";
 }
