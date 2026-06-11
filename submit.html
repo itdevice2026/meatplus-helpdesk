@@ -62,7 +62,7 @@
     <button class="btn" id="submitBtn">Submit ticket</button>
     <div class="err" id="err"></div>
   </div>
-  <div class="foot">IT staff? <a href="index.html">Sign in to the helpdesk →</a></div>
+  <div class="foot">Already submitted? <a href="status.html">Check ticket status →</a> &nbsp;·&nbsp; IT staff? <a href="index.html">Sign in →</a></div>
 </div>
 
 <script>
@@ -92,12 +92,11 @@ async function submitTicket(){
       if(ue){ $("#submitBtn").disabled=false; $("#submitBtn").textContent="Submit ticket"; $("#err").textContent=`Couldn't upload "${f.name}": ${ue.message}`; return; }
     }
   }
-  const {error}=await db.from("tickets").insert({
-    subject, description:$("#f_desc").value.trim(),
-    requester_name:name, requester_email:email,
-    category:$("#f_category").value, priority:$("#f_priority").value,
-    attachment_ref:ref, attachment_count:files.length
-    // status defaults to 'open', assignment left null (enforced by policy)
+  const {data:ticketNo,error}=await db.rpc("submit_public_ticket",{
+    p_subject:subject, p_description:$("#f_desc").value.trim(),
+    p_name:name, p_email:email,
+    p_category:$("#f_category").value, p_priority:$("#f_priority").value,
+    p_attachment_ref:ref, p_attachment_count:files.length
   });
   $("#submitBtn").disabled=false; $("#submitBtn").textContent="Submit ticket";
   if(error){ $("#err").textContent="Sorry, something went wrong: "+error.message; return; }
@@ -107,9 +106,13 @@ async function submitTicket(){
   box.querySelector(".foot").style.display="none";
   const s=document.createElement("div");
   s.className="success";
+  const en=s=>(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const tn=en(ticketNo||"");
   s.innerHTML=`<div class="ico">✓</div><h2>Ticket submitted!</h2>
-    <p>Thanks, ${name.replace(/[&<>"]/g,'')}. The IT team has received your request and will follow up by email at <b>${email.replace(/[&<>"]/g,'')}</b>.</p>
-    <button class="btn" onclick="location.reload()">Submit another</button>`;
+    <p>Thanks, ${en(name)}. Your ticket number is <b style="font-family:ui-monospace,monospace;color:#fff">${tn}</b>.<br>The IT team will follow up by email at <b>${en(email)}</b>.</p>
+    <p style="color:var(--muted);font-size:12px;margin-top:6px">Save your ticket number — you'll need it (with your email) to check status.</p>
+    <a class="btn" style="display:inline-block;max-width:280px;text-decoration:none;margin-top:14px" href="status.html?t=${encodeURIComponent(ticketNo||"")}">Check this ticket's status →</a>
+    <button class="btn" style="background:var(--panel2);border:1px solid var(--line);margin-top:10px" onclick="location.reload()">Submit another</button>`;
   box.appendChild(s);
 }
 // Populate subject choices from the catalog (anon read-only)

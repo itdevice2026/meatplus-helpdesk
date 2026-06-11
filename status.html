@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Check Ticket Status · MeatPlus IT Helpdesk</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#1a212b; --panel2:#222c38; --line:#2d3845;
+    --txt:#e6edf3; --muted:#8b98a5; --accent:#3b82f6; --accent2:#2563eb;
+    --green:#22c55e; --amber:#f59e0b; --red:#ef4444; --purple:#a855f7; --cyan:#06b6d4;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:radial-gradient(circle at 30% 10%,#172033,#0f1419);color:var(--txt);min-height:100vh;padding:30px 16px;display:flex;justify-content:center}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:100%;max-width:600px;height:fit-content;box-shadow:0 24px 60px rgba(0,0,0,.45);overflow:hidden}
+  .head{padding:24px 28px;border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:11px;margin-bottom:6px}
+  .mp-badge{background:#fff;border-radius:13px;padding:11px 18px;display:inline-flex;align-items:center}
+  .mp-badge img{display:block;height:60px;width:auto}
+  .head h1{font-size:17px;margin-top:8px}
+  .head p{color:var(--muted);font-size:13px;margin-top:4px}
+  .body{padding:24px 28px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .field{margin-bottom:16px}
+  .field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px;font-weight:600}
+  .field input{width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:11px 13px;font-size:14px}
+  .btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:600;cursor:pointer;margin-top:4px}
+  .btn:hover{background:var(--accent2)}
+  .btn:disabled{opacity:.6;cursor:default}
+  .err{color:var(--red);font-size:13px;min-height:18px;margin-top:10px}
+  .foot{text-align:center;color:var(--muted);font-size:12px;padding:0 28px 22px}
+  .foot a{color:var(--accent);text-decoration:none}
+  /* result */
+  #result{margin-top:8px;display:none}
+  .rcard{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:6px}
+  .rtop{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+  .tn{font-family:ui-monospace,monospace;color:var(--muted);font-size:13px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:99px;font-size:12px;font-weight:700;text-transform:capitalize}
+  .pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+  .s-open{background:rgba(59,130,246,.15);color:#60a5fa}
+  .s-in_progress{background:rgba(168,85,247,.15);color:#c084fc}
+  .s-pending{background:rgba(245,158,11,.15);color:#fbbf24}
+  .s-resolved{background:rgba(34,197,94,.15);color:#4ade80}
+  .s-closed{background:rgba(139,152,165,.15);color:#9aa6b2}
+  .rsubj{font-size:17px;font-weight:600;margin:8px 0 14px}
+  .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:8px}
+  .meta .k{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
+  .meta .v{font-size:14px;text-transform:capitalize}
+  .replies{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+  .replies h3{font-size:13px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px}
+  .reply{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+  .reply .rmeta{display:flex;gap:8px;align-items:center;margin-bottom:5px}
+  .reply .nm{font-weight:600;font-size:13px}
+  .reply .tm{color:var(--muted);font-size:11px}
+  .reply .txt{color:#cdd6df;line-height:1.5;white-space:pre-wrap;font-size:13px}
+  .notfound{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);color:#f87171;border-radius:10px;padding:14px;font-size:14px;margin-top:6px}
+  .atts{margin-top:14px}
+  .atts a{display:inline-block;color:var(--accent);text-decoration:none;font-size:13px;margin-right:14px}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="head">
+    <div class="brand">
+      <span class="mp-badge"><img src="logo.png" alt="MeatPlus Trading Corporation" /></span>
+    </div>
+    <h1>Check Ticket Status</h1>
+    <p>Enter your ticket number and the email you used to submit it.</p>
+  </div>
+  <div class="body">
+    <div class="row">
+      <div class="field"><label>Ticket number</label><input id="t_num" placeholder="e.g. TKT-01005" /></div>
+      <div class="field"><label>Your email</label><input id="t_email" type="email" placeholder="name@meatplus.ph" /></div>
+    </div>
+    <button class="btn" id="checkBtn">Check status</button>
+    <div class="err" id="err"></div>
+    <div id="result"></div>
+  </div>
+  <div class="foot">Need to report something new? <a href="submit.html">Submit a ticket →</a> &nbsp;·&nbsp; IT staff? <a href="index.html">Sign in →</a></div>
+</div>
+
+<script>
+const db = supabase.createClient(
+  "https://emkcwukiqxnvcbhkjiqz.supabase.co",
+  "sb_publishable_u_qnmEI8oHI9Z_A0-Hht3Q_Yvaa7Ork",
+  { auth: { persistSession:false, autoRefreshToken:false, detectSessionInUrl:false, storageKey:"mp-status-noauth" } }
+);
+const $ = s => document.querySelector(s);
+const esc = s => (s??"").toString().replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt = d => d? new Date(d).toLocaleString([], {year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
+const PUB = p => db.storage.from("ticket-files").getPublicUrl(p).data.publicUrl;
+
+async function check(){
+  const num=$("#t_num").value.trim(), email=$("#t_email").value.trim();
+  $("#err").textContent=""; $("#result").style.display="none";
+  if(!num||!email){ $("#err").textContent="Please enter both your ticket number and email."; return; }
+  const btn=$("#checkBtn"); btn.disabled=true; btn.textContent="Checking…";
+  const {data,error}=await db.rpc("lookup_ticket",{p_number:num,p_email:email});
+  btn.disabled=false; btn.textContent="Check status";
+  if(error){ $("#err").textContent="Sorry, something went wrong. Please try again."; return; }
+  if(!data || !data.found){
+    $("#result").innerHTML=`<div class="notfound">No ticket found matching that number and email. Double-check your ticket number (e.g. <b>TKT-01005</b>) and use the same email you submitted with.</div>`;
+    $("#result").style.display="block"; return;
+  }
+  render(data);
+}
+
+async function render(d){
+  const st=d.status, stLabel=st.replace("_"," ");
+  let attHtml="";
+  if(d.attachment_count>0 && d.attachment_ref){
+    const {data:files}=await db.storage.from("ticket-files").list("tickets/"+d.attachment_ref,{limit:50});
+    const list=(files||[]).filter(f=>f.name && f.name!==".emptyFolderPlaceholder");
+    if(list.length) attHtml=`<div class="atts"><div class="k" style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Your attachments</div>${list.map(f=>`<a href="${PUB("tickets/"+d.attachment_ref+"/"+f.name)}" target="_blank" rel="noopener">📎 ${esc(f.name.replace(/^\d+_/,""))}</a>`).join("")}</div>`;
+  }
+  const replies=(d.comments||[]);
+  const repliesHtml = replies.length
+    ? `<div class="replies"><h3>Updates from IT (${replies.length})</h3>${replies.map(c=>`<div class="reply"><div class="rmeta"><span class="nm">${esc(c.author)}</span><span class="tm">${fmt(c.created_at)}</span></div><div class="txt">${esc(c.body)}</div></div>`).join("")}</div>`
+    : "";
+  $("#result").innerHTML=`
+    <div class="rcard">
+      <div class="rtop"><span class="tn">${esc(d.ticket_number)}</span><span class="pill s-${st}">${stLabel}</span></div>
+      <div class="rsubj">${esc(d.subject)}</div>
+      <div class="meta">
+        <div><div class="k">Priority</div><div class="v">${esc(d.priority)}</div></div>
+        <div><div class="k">Category</div><div class="v">${esc(d.category)}</div></div>
+        <div><div class="k">Assigned to</div><div class="v">${d.assigned_to?esc(d.assigned_to):'<span style="color:var(--muted);text-transform:none">Awaiting assignment</span>'}</div></div>
+        <div><div class="k">Submitted</div><div class="v" style="text-transform:none">${fmt(d.created_at)}</div></div>
+        <div><div class="k">Last update</div><div class="v" style="text-transform:none">${fmt(d.updated_at)}</div></div>
+        ${d.resolved_at?`<div><div class="k">Resolved</div><div class="v" style="text-transform:none">${fmt(d.resolved_at)}</div></div>`:''}
+      </div>
+      ${attHtml}
+      ${repliesHtml}
+    </div>`;
+  $("#result").style.display="block";
+}
+
+$("#checkBtn").onclick=check;
+$("#t_email").addEventListener("keydown",e=>{if(e.key==="Enter")check();});
+$("#t_num").addEventListener("keydown",e=>{if(e.key==="Enter")check();});
+// Prefill from ?t=TKT-01005 if present
+const qp=new URLSearchParams(location.search); if(qp.get("t")) $("#t_num").value=qp.get("t");
+</script>
+</body>
+</html>
