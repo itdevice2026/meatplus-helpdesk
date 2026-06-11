@@ -182,6 +182,7 @@
   </div>
   <div class="who">
     <button class="btn ghost sm" id="subjBtn" style="display:none">🏷 Subjects</button>
+    <button class="btn ghost sm" id="urgBtn" style="display:none">⚡ Urgency</button>
     <button class="btn ghost sm" id="adminBtn" style="display:none">⚙ Manage team</button>
     <div class="me"><span class="avatar" id="meAvatar"></span><span id="meName"></span><span class="rolebadge" id="meRole"></span></div>
     <button class="signout" id="pwBtn" title="Change your password">Change password</button>
@@ -269,6 +270,14 @@
   </div>
 </div>
 
+<!-- Admin: category urgency modal -->
+<div class="overlay" id="urgModal">
+  <div class="modal">
+    <h2>⚡ Default urgency by category <button class="close" data-close>&times;</button></h2>
+    <div class="body" id="urgBody"></div>
+  </div>
+</div>
+
 <!-- Admin: manage team modal -->
 <div class="overlay" id="adminModal">
   <div class="modal">
@@ -307,6 +316,26 @@ async function loadAgents(){
   $("#fAgent").innerHTML = `<option value="">All agents</option><option value="__un">Unassigned</option>`+opts;
 }
 function agentName(id){ const a=AGENTS.find(x=>x.id===id); return a?a.name:null; }
+
+let CATURG={};
+const CATS=["hardware","software","network","account","email","security","access","other"];
+async function loadCatUrgency(){
+  const {data}=await db.from("category_urgency").select("*");
+  CATURG={}; (data||[]).forEach(r=>CATURG[r.category]=r.default_priority);
+}
+async function openUrgency(){
+  $("#urgModal").classList.add("show");
+  await loadCatUrgency();
+  const sel=(cat)=>`<select onchange="setUrgency('${cat}',this.value)">`+["low","medium","high","urgent"].map(p=>`<option value="${p}" ${CATURG[cat]===p?"selected":""}>${p}</option>`).join("")+`</select>`;
+  $("#urgBody").innerHTML=`
+    <p style="color:var(--muted);font-size:13px;margin-bottom:12px">When someone picks a category on the New Ticket or public submit form, the urgency auto-fills to the default below. They can still change it.</p>
+    ${CATS.map(c=>`<div class="agentrow"><div style="flex:1;text-transform:capitalize;font-weight:600">${c}</div>${sel(c)}</div>`).join("")}`;
+}
+async function setUrgency(cat,priority){
+  const {error}=await db.from("category_urgency").upsert({category:cat,default_priority:priority},{onConflict:"category"});
+  if(error){ toast(error.message,true); return; }
+  CATURG[cat]=priority; toast("Updated ✓");
+}
 
 let SUBJECTS=[];
 async function loadSubjects(){
@@ -412,7 +441,7 @@ function render(){
 }
 
 /* ---- New ticket ---- */
-function openNew(){ ["n_subject","n_desc","n_rname","n_remail"].forEach(i=>$("#"+i).value=""); $("#n_priority").value="medium"; $("#n_category").value="other"; $("#n_agent").value=""; $("#n_files").value=""; $("#newModal").classList.add("show"); }
+function openNew(){ ["n_subject","n_desc","n_rname","n_remail"].forEach(i=>$("#"+i).value=""); $("#n_category").value="other"; $("#n_priority").value=CATURG["other"]||"medium"; $("#n_agent").value=""; $("#n_files").value=""; $("#newModal").classList.add("show"); }
 async function uploadFiles(files, ref){
   for(const f of files){
     if(f.size>10485760) return {error:`"${f.name}" is larger than 10 MB.`};
@@ -625,6 +654,8 @@ $("#newBtn").onclick=openNew;
 $("#createBtn").onclick=createTicket;
 $("#adminBtn").onclick=openAdmin;
 $("#subjBtn").onclick=openSubjects;
+$("#urgBtn").onclick=openUrgency;
+$("#n_category").addEventListener("change",e=>{ const p=CATURG[e.target.value]; if(p) $("#n_priority").value=p; });
 ["search","fStatus","fPriority","fAgent"].forEach(id=>$("#"+id).addEventListener("input",render));
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>b.closest(".overlay").classList.remove("show"));
 document.querySelectorAll(".overlay").forEach(o=>o.onclick=e=>{if(e.target===o)o.classList.remove("show");});
@@ -639,6 +670,7 @@ function applyRole(){
   $("#newBtn").style.display = canEdit() ? "" : "none";
   $("#adminBtn").style.display = isAdmin() ? "" : "none";
   $("#subjBtn").style.display = isAdmin() ? "" : "none";
+  $("#urgBtn").style.display = isAdmin() ? "" : "none";
   $("#roBanner").style.display = ROLE==='manager' ? "block" : "none";
 }
 async function startApp(){
@@ -655,7 +687,7 @@ async function startApp(){
 async function enterApp(){
   $("#login").style.display="none"; $("#forcePw").style.display="none"; $("#app").style.display="block";
   applyRole();
-  await loadAgents(); await loadSubjects(); await Promise.all([loadStats(),loadTickets()]);
+  await loadAgents(); await loadSubjects(); await loadCatUrgency(); await Promise.all([loadStats(),loadTickets()]);
 }
 async function submitForcePw(){
   const a=$("#fp_new").value, b=$("#fp_confirm").value; $("#fp_err").textContent="";

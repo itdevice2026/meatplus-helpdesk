@@ -119,6 +119,15 @@ async function submitTicket(){
   if(dl&&data){ const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); dl.innerHTML=data.map(s=>`<option value="${esc(s.label)}"></option>`).join(""); }
 })();
 
+// Auto-fill urgency from the chosen category (admin-defined defaults)
+(async()=>{
+  const {data}=await db.from("category_urgency").select("*");
+  const m={}; (data||[]).forEach(r=>m[r.category]=r.default_priority);
+  const apply=()=>{ const p=m[$("#f_category").value]; if(p) $("#f_priority").value=p; };
+  $("#f_category").addEventListener("change",apply);
+  apply();
+})();
+
 $("#submitBtn").onclick=submitTicket;
 [ "f_subject","f_email" ].forEach(id=>$("#"+id).addEventListener("keydown",e=>{if(e.key==="Enter")submitTicket();}));
 </script>
