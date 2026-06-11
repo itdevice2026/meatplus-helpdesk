@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>HR Onboarding Portal · MeatPlus IT</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
   :root{--bg:#0f1419;--panel:#1a212b;--panel2:#222c38;--line:#2d3845;--txt:#e6edf3;--muted:#8b98a5;--accent:#3b82f6;--accent2:#2563eb;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--purple:#a855f7;--cyan:#06b6d4;}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -116,6 +119,8 @@
 <div class="wrap">
   <div class="toolbar">
     <h2>Onboarding requests</h2><div class="sp"></div>
+    <button class="btn ghost" id="xlsBtn">⬇ Excel</button>
+    <button class="btn ghost" id="pdfBtn">⬇ PDF</button>
     <button class="btn" id="newBtn">+ New onboarding request</button>
   </div>
   <div class="card"><table>
@@ -205,6 +210,7 @@ function openDetail(id){
   $("#d_num").textContent=r.request_number;
   const items=Array.isArray(r.items)?r.items:[];
   $("#detailBody").innerHTML=`
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn ghost" style="padding:6px 12px;font-size:12px" onclick="reqPdf(${r.id})">⬇ Download PDF</button></div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><h3 style="font-size:17px">${esc(r.employee_name)}</h3><span class="typ t-${r.employee_type}">${r.employee_type}</span><span class="pill s-${r.status}" style="margin-left:auto">${r.status.replace("_"," ")}</span></div>
     <div class="meta">
       <div><div class="k">Position</div>${esc(r.position||'—')}</div>
@@ -220,6 +226,14 @@ function openDetail(id){
     <p style="color:var(--muted);font-size:12px">IT updates progress on their side — check back here to see items completed and status change.</p>`;
   $("#detailModal").classList.add("show");
 }
+
+/* ---- reports (Excel + PDF) ---- */
+function onbRow(r){ const items=Array.isArray(r.items)?r.items:[]; const m365=(items.find(i=>/microsoft 365 license/i.test(i.label))||{}).value||''; const il=items.filter(i=>!/microsoft 365 license/i.test(i.label)).map(i=>i.label+(i.done?' (done)':'')).join('; '); return {'Request #':r.request_number,'New hire':r.employee_name,'Type':r.employee_type,'Position':r.position||'','Department':r.department||'','Start date':r.start_date||'','IT items':il,'M365 license':m365,'Status':r.status,'Requested by':r.requested_by_name||'','Submitted':new Date(r.created_at).toLocaleString()}; }
+function pdfHeader(doc,title){ try{const img=document.querySelector('.mp-badge img'); if(img&&img.complete) doc.addImage(img,'PNG',14,8,28,21);}catch(e){} doc.setFontSize(15); doc.text(title,48,18); doc.setFontSize(9); doc.setTextColor(120); doc.text('Generated '+new Date().toLocaleString(),48,25); doc.setTextColor(0); }
+function exportXlsx(){ if(!REQS.length){toast('No requests to export',true);return;} const ws=XLSX.utils.json_to_sheet(REQS.map(onbRow)); ws['!cols']=[{wch:11},{wch:22},{wch:10},{wch:18},{wch:16},{wch:12},{wch:42},{wch:16},{wch:12},{wch:18},{wch:20}]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Onboarding'); XLSX.writeFile(wb,'onboarding-requests-'+new Date().toISOString().slice(0,10)+'.xlsx'); toast('Excel downloaded ✓'); }
+function exportPdfList(){ if(!REQS.length){toast('No requests to export',true);return;} const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:'landscape'}); pdfHeader(doc,'IT Onboarding Requests'); const rows=REQS.map(onbRow); const cols=Object.keys(rows[0]); doc.autoTable({startY:34,head:[cols],body:rows.map(r=>cols.map(c=>r[c])),styles:{fontSize:7,cellPadding:1.5,overflow:'linebreak'},headStyles:{fillColor:[59,130,246]},columnStyles:{6:{cellWidth:46}}}); doc.save('onboarding-requests-'+new Date().toISOString().slice(0,10)+'.pdf'); toast('PDF downloaded ✓'); }
+function reqPdf(id){ const r=REQS.find(x=>x.id===id); if(!r)return; const {jsPDF}=window.jspdf; const doc=new jsPDF(); pdfHeader(doc,'IT Onboarding Request'); doc.setFontSize(12); doc.text(r.request_number,14,34); const items=Array.isArray(r.items)?r.items:[]; doc.autoTable({startY:40,theme:'plain',styles:{fontSize:10,cellPadding:1.5},columnStyles:{0:{fontStyle:'bold',cellWidth:40}},body:[['New hire',r.employee_name],['Type',r.employee_type],['Position',r.position||'—'],['Department',r.department||'—'],['Start date',r.start_date||'—'],['Contact',r.contact_email||'—'],['Status',r.status],['Requested by',r.requested_by_name||'—']]}); doc.autoTable({startY:doc.lastAutoTable.finalY+6,head:[['IT item / access','Detail','Provided']],body:items.length?items.map(it=>[it.label,it.value||'',it.done?'Yes':'No']):[['(none specified)','','']],headStyles:{fillColor:[59,130,246]},styles:{fontSize:9}}); if(r.notes){ let y=doc.lastAutoTable.finalY+10; doc.setFontSize(11); doc.text('Notes',14,y); doc.setFontSize(9); doc.text(doc.splitTextToSize(r.notes,180),14,y+6); } doc.save(r.request_number+'.pdf'); }
+$("#xlsBtn").onclick=exportXlsx; $("#pdfBtn").onclick=exportPdfList;
 
 /* change password */
 $("#pwBtn")&&($("#pwBtn").onclick=async()=>{ const np=prompt("Enter a new password (at least 8 characters):"); if(np===null)return; if(np.length<8){toast("Password must be at least 8 characters",true);return;} const {error}=await db.auth.updateUser({password:np}); if(error){toast(error.message,true);return;} await db.rpc("mark_password_changed"); toast("Password updated ✓"); });
