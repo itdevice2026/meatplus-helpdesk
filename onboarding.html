@@ -143,10 +143,10 @@
       <div class="field"><label>New hire full name *</label><input id="n_name" placeholder="Full name"/></div>
       <div class="field"><label>Type</label><select id="n_type"><option value="employee">Employee</option><option value="intern">Intern</option></select></div>
     </div>
-    <div class="field"><label>Company</label><select id="n_company"><option value="">— Select company —</option></select></div>
+    <div class="field"><label>Company *</label><select id="n_company"><option value="">— Select company —</option></select></div>
     <div class="row2">
-      <div class="field"><label>Position / title</label><select id="n_pos"><option value="">— Select position —</option></select></div>
-      <div class="field"><label>Department</label><select id="n_dept"><option value="">— Select department —</option></select></div>
+      <div class="field"><label>Position / title *</label><select id="n_pos"><option value="">— Select position —</option></select></div>
+      <div class="field"><label>Department *</label><select id="n_dept"><option value="">— Select department —</option></select></div>
     </div>
     <div class="row2">
       <div class="field"><label>Start date</label><input id="n_start" type="date"/></div>
@@ -246,6 +246,9 @@ function openEdit(id){
 async function createReq(){
   const name=$("#n_name").value.trim(); $("#n_err").textContent="";
   if(!name){ $("#n_err").textContent="New hire name is required."; return; }
+  if(!$("#n_company").value.trim()){ $("#n_err").textContent="Please select a company."; return; }
+  if(!$("#n_pos").value.trim()){ $("#n_err").textContent="Please select a position / title."; return; }
+  if(!$("#n_dept").value.trim()){ $("#n_err").textContent="Please select a department."; return; }
   const items=[...document.querySelectorAll('#n_items input:checked')].map(c=>c.value);
   const joFiles=$("#n_jo").files;
   const btn=$("#createBtn");
