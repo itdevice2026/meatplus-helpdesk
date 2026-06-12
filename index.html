@@ -184,7 +184,7 @@
 <div id="app">
 <header>
   <div class="logo">
-    <span class="mp-badge"><img src="logo.png" alt="MeatPlus" /></span>
+    <span class="mp-badge"><img id="hdrBadgeImg" src="logo.png" alt="MeatPlus" /></span>
     <span class="sub" style="font-size:14px">IT Helpdesk · Ticketing System</span>
   </div>
   <div class="who">
@@ -393,7 +393,10 @@ async function setUrgency(cat,priority){
 }
 
 /* ---- Onboarding board (IT side) ---- */
-let ONB=[];
+let ONB=[], COMPANYMAP={};
+function companyLogoSrc(name){ const code=COMPANYMAP[name]; return code? code.toUpperCase()+'.png' : null; }
+function setCompanyBadge(name){ const img=document.getElementById('hdrBadgeImg'); if(!img) return; if(!img.dataset.orig) img.dataset.orig=img.getAttribute('src'); const src=companyLogoSrc(name); if(src){ img.onerror=function(){ img.onerror=null; img.src=img.dataset.orig||'logo.png'; }; img.src=src; } else { resetBadge(); } }
+function resetBadge(){ const img=document.getElementById('hdrBadgeImg'); if(img&&img.dataset.orig){ img.onerror=null; img.src=img.dataset.orig; } }
 const onbDate=d=>d?new Date(d).toLocaleDateString([], {year:"numeric",month:"short",day:"numeric"}):"—";
 async function openOnbBoard(){
   $("#onbModal").classList.add("show");
@@ -401,6 +404,7 @@ async function openOnbBoard(){
   const {data,error}=await db.from("onboarding_requests").select("*").order("created_at",{ascending:false});
   if(error){ $("#onbBody").innerHTML=`<div class="empty">${esc(error.message)}</div>`; return; }
   ONB=data||[];
+  const {data:cmp}=await db.from("onboarding_companies").select("name,code"); COMPANYMAP={}; (cmp||[]).forEach(c=>{ if(c.code) COMPANYMAP[c.name]=c.code; });
   const mItems=isAdmin()?`<button class="btn ghost sm" onclick="openOnbItems()">🧰 Manage items</button>`:'';
   $("#onbBody").innerHTML=`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><div style="color:var(--muted);font-size:13px;flex:1">Requests from HR for new-hire / intern IT setup.</div><button class="btn ghost sm" onclick="onbXlsx()">⬇ Excel</button><button class="btn ghost sm" onclick="onbPdfList()">⬇ PDF</button>${mItems}</div>
@@ -422,6 +426,7 @@ async function onbJoLinks(ref){
 }
 function openOnbDetail(id){
   const r=ONB.find(x=>x.id===id); if(!r) return;
+  setCompanyBadge(r.company);
   $("#onbd_num").textContent=r.request_number;
   const items=Array.isArray(r.items)?r.items:[]; const ed=canEdit();
   const statusSel = ed?`<select onchange="setOnbStatus(${id},this.value)">${["new","in_progress","completed","cancelled"].map(s=>`<option ${r.status===s?"selected":""}>${s}</option>`).join("")}</select>`:`<div class="ro">${r.status.replace("_"," ")}</div>`;
@@ -966,9 +971,9 @@ $("#compBtn").onclick=openCompanies;
 $("#onbBtn").onclick=openOnbBoard;
 $("#n_category").addEventListener("change",e=>{ const p=CATURG[e.target.value]; if(p) $("#n_priority").value=p; });
 ["search","fStatus","fPriority","fAgent"].forEach(id=>$("#"+id).addEventListener("input",render));
-document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>b.closest(".overlay").classList.remove("show"));
-document.querySelectorAll(".overlay").forEach(o=>o.onclick=e=>{if(e.target===o)o.classList.remove("show");});
-document.addEventListener("keydown",e=>{if(e.key==="Escape")document.querySelectorAll(".overlay.show").forEach(o=>o.classList.remove("show"));});
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>{b.closest(".overlay").classList.remove("show"); resetBadge();});
+document.querySelectorAll(".overlay").forEach(o=>o.onclick=e=>{if(e.target===o){o.classList.remove("show"); resetBadge();}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){document.querySelectorAll(".overlay.show").forEach(o=>o.classList.remove("show")); resetBadge();}});
 
 /* ---- auth + role gate ---- */
 function applyRole(){

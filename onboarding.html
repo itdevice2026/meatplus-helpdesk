@@ -107,7 +107,7 @@
 
 <div id="app">
 <header>
-  <span class="mp-badge"><img src="logo.png" alt="MeatPlus"/></span>
+  <span class="mp-badge"><img id="hdrBadgeImg" src="logo.png" alt="MeatPlus"/></span>
   <span class="sub">HR Onboarding Portal</span>
   <div class="who">
     <a class="lnk" id="itLink" href="index.html" style="display:none">IT Helpdesk</a>
@@ -174,7 +174,11 @@ function toast(m,e){const t=$("#toast");t.textContent=m;t.className="toast show"
 async function loadItems(){ const {data}=await db.from("onboarding_items").select("*").eq("active",true).order("sort").order("label"); ITEMS=data||[]; $("#n_items").innerHTML=ITEMS.map(i=>`<label class="chk"><input type="checkbox" value="${esc(i.label)}"> ${esc(i.label)}</label>`).join(""); }
 async function loadDepts(){ const {data}=await db.from("departments").select("name").eq("active",true).order("sort_order").order("name"); const sel=$("#n_dept"); if(sel&&data){ sel.innerHTML='<option value="">— Select department —</option>'+data.map(d=>`<option value="${esc(d.name)}">${esc(d.name)}</option>`).join(""); } }
 async function loadPositions(){ const {data}=await db.from("positions").select("name").eq("active",true).order("sort_order").order("name"); const sel=$("#n_pos"); if(sel&&data){ sel.innerHTML='<option value="">— Select position —</option>'+data.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join(""); } }
-async function loadCompanies(){ const {data}=await db.from("onboarding_companies").select("name").eq("active",true).order("sort_order").order("name"); const sel=$("#n_company"); if(sel&&data){ sel.innerHTML='<option value="">— Select company —</option>'+data.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join(""); } }
+let COMPANYMAP={};
+async function loadCompanies(){ const {data}=await db.from("onboarding_companies").select("name,code").eq("active",true).order("sort_order").order("name"); COMPANYMAP={}; (data||[]).forEach(c=>{ if(c.code) COMPANYMAP[c.name]=c.code; }); const sel=$("#n_company"); if(sel&&data){ sel.innerHTML='<option value="">— Select company —</option>'+data.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join(""); } }
+function companyLogoSrc(name){ const code=COMPANYMAP[name]; return code? code.toUpperCase()+'.png' : null; }
+function setCompanyBadge(name){ const img=document.getElementById('hdrBadgeImg'); if(!img) return; if(!img.dataset.orig) img.dataset.orig=img.getAttribute('src'); const src=companyLogoSrc(name); if(src){ img.onerror=function(){ img.onerror=null; img.src=img.dataset.orig||'logo.png'; }; img.src=src; } else { resetBadge(); } }
+function resetBadge(){ const img=document.getElementById('hdrBadgeImg'); if(img&&img.dataset.orig){ img.onerror=null; img.src=img.dataset.orig; } }
 async function loadReqs(){
   const {data,error}=await db.from("onboarding_requests").select("*").order("created_at",{ascending:false});
   if(error){toast(error.message,true);return;}
@@ -277,6 +281,7 @@ async function joLinks(ref){
 }
 function openDetail(id){
   const r=REQS.find(x=>x.id===id); if(!r) return;
+  setCompanyBadge(r.company);
   $("#d_num").textContent=r.request_number;
   const items=Array.isArray(r.items)?r.items:[];
   const canManage = (ROLE==="admin") || (ME && r.requested_by===ME.user_id);
@@ -323,9 +328,9 @@ $("#pwBtn")&&($("#pwBtn").onclick=async()=>{ const np=prompt("Enter a new passwo
 
 /* wire */
 $("#newBtn").onclick=openNew; $("#createBtn").onclick=createReq;
-document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>b.closest(".overlay").classList.remove("show"));
-document.querySelectorAll(".overlay").forEach(o=>o.onclick=e=>{if(e.target===o)o.classList.remove("show");});
-document.addEventListener("keydown",e=>{if(e.key==="Escape")document.querySelectorAll(".overlay.show").forEach(o=>o.classList.remove("show"));});
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>{b.closest(".overlay").classList.remove("show"); resetBadge();});
+document.querySelectorAll(".overlay").forEach(o=>o.onclick=e=>{if(e.target===o){o.classList.remove("show"); resetBadge();}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){document.querySelectorAll(".overlay.show").forEach(o=>o.classList.remove("show")); resetBadge();}});
 $("#signoutBtn").onclick=async()=>{await db.auth.signOut();location.reload();};
 $("#na_signout").onclick=async()=>{await db.auth.signOut();location.reload();};
 $("#fp_signout").onclick=async()=>{await db.auth.signOut();location.reload();};
