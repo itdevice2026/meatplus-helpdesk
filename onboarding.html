@@ -124,8 +124,8 @@
     <button class="btn" id="newBtn">+ New onboarding request</button>
   </div>
   <div class="card"><table>
-    <thead><tr><th>#</th><th>New hire</th><th>Type</th><th>Department</th><th>Start date</th><th>IT items</th><th>Status</th><th>Requested</th></tr></thead>
-    <tbody id="rows"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+    <thead><tr><th>#</th><th>New hire</th><th>Type</th><th>Company</th><th>Department</th><th>Start date</th><th>IT items</th><th>Status</th><th>Requested</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
   </table></div>
 </div>
 </div>
@@ -179,13 +179,14 @@ async function loadReqs(){
   const {data,error}=await db.from("onboarding_requests").select("*").order("created_at",{ascending:false});
   if(error){toast(error.message,true);return;}
   REQS=data||[];
-  if(!REQS.length){ $("#rows").innerHTML=`<tr><td colspan="8" class="empty">No onboarding requests yet. Click “New onboarding request”.</td></tr>`; return; }
+  if(!REQS.length){ $("#rows").innerHTML=`<tr><td colspan="9" class="empty">No onboarding requests yet. Click “New onboarding request”.</td></tr>`; return; }
   $("#rows").innerHTML=REQS.map(r=>{
     const items=Array.isArray(r.items)?r.items:[]; const done=items.filter(x=>x.done).length;
     return `<tr onclick="openDetail(${r.id})">
       <td><span class="tn">${esc(r.request_number)}</span></td>
       <td>${esc(r.employee_name)}${r.position?`<div style="color:var(--muted);font-size:11px">${esc(r.position)}</div>`:''}</td>
       <td><span class="typ t-${r.employee_type}">${r.employee_type}</span></td>
+      <td>${esc(r.company||'—')}</td>
       <td>${esc(r.department||'—')}</td>
       <td>${fmtD(r.start_date)}</td>
       <td class="prog">${done}/${items.length} done</td>

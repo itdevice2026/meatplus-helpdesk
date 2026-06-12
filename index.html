@@ -405,8 +405,8 @@ async function openOnbBoard(){
   $("#onbBody").innerHTML=`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><div style="color:var(--muted);font-size:13px;flex:1">Requests from HR for new-hire / intern IT setup.</div><button class="btn ghost sm" onclick="onbXlsx()">⬇ Excel</button><button class="btn ghost sm" onclick="onbPdfList()">⬇ PDF</button>${mItems}</div>
     ${ONB.length?`<table style="width:100%;border-collapse:collapse">
-      <thead><tr><th>#</th><th>New hire</th><th>Type</th><th>Dept</th><th>Start</th><th>Items</th><th>Status</th></tr></thead>
-      <tbody>${ONB.map(r=>{const it=Array.isArray(r.items)?r.items:[];const dn=it.filter(x=>x.done).length;return `<tr style="cursor:pointer" onclick="openOnbDetail(${r.id})"><td><span class="tn">${esc(r.request_number)}</span></td><td>${esc(r.employee_name)}</td><td style="text-transform:capitalize">${esc(r.employee_type)}</td><td>${esc(r.department||'—')}</td><td>${onbDate(r.start_date)}</td><td style="color:var(--muted)">${dn}/${it.length}</td><td><span class="pill s-${r.status}">${r.status.replace("_"," ")}</span></td></tr>`;}).join("")}</tbody></table>`
+      <thead><tr><th>#</th><th>New hire</th><th>Type</th><th>Company</th><th>Dept</th><th>Start</th><th>Items</th><th>Status</th></tr></thead>
+      <tbody>${ONB.map(r=>{const it=Array.isArray(r.items)?r.items:[];const dn=it.filter(x=>x.done).length;return `<tr style="cursor:pointer" onclick="openOnbDetail(${r.id})"><td><span class="tn">${esc(r.request_number)}</span></td><td>${esc(r.employee_name)}</td><td style="text-transform:capitalize">${esc(r.employee_type)}</td><td>${esc(r.company||'—')}</td><td>${esc(r.department||'—')}</td><td>${onbDate(r.start_date)}</td><td style="color:var(--muted)">${dn}/${it.length}</td><td><span class="pill s-${r.status}">${r.status.replace("_"," ")}</span></td></tr>`;}).join("")}</tbody></table>`
     :`<div class="empty">No onboarding requests yet.</div>`}`;
 }
 async function onbJoLinks(ref){
@@ -644,23 +644,32 @@ async function openCompanies(){
       #compBody .srow .lbl{flex:1}
       #compBody .off{opacity:.5}
     </style>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:10px">These appear as the Company choices on the HR onboarding form.</p>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:10px">These appear as the Company choices on the HR onboarding form. The <b>code</b> (e.g. MTC) is used in the transaction number: <span class="tn">ONB&lt;CODE&gt;MMDDYYYY-001</span>.</p>
     <div class="addbox">
-      <input class="sin" id="comp_new" placeholder="Add a new company…" />
+      <input class="sin" id="comp_new" placeholder="Add a new company…" style="flex:1" />
+      <input class="sin" id="comp_newcode" placeholder="CODE" style="width:90px;text-transform:uppercase" maxlength="6" />
       <button class="btn sm" onclick="addCompany()">Add</button>
     </div>
     ${(data||[]).map(c=>`
       <div class="srow ${c.active?'':'off'}">
         <input class="sin lbl" value="${esc(c.name)}" onchange="renameCompany('${c.id}',this.value)" />
+        <input class="sin" value="${esc(c.code||'')}" onchange="setCompanyCode('${c.id}',this.value)" placeholder="CODE" style="width:90px;text-transform:uppercase" maxlength="6" title="Code used in the transaction number" />
         <button class="btn ghost sm" onclick="toggleCompany('${c.id}',${c.active?'false':'true'})">${c.active?'Hide':'Show'}</button>
         <button class="btn danger sm" onclick="removeCompany('${c.id}')">Remove</button>
       </div>`).join("")}`;
 }
 async function addCompany(){
   const name=$("#comp_new").value.trim(); if(!name){ toast("Type a company first",true); return; }
-  const {error}=await db.from("onboarding_companies").insert({name});
+  const code=($("#comp_newcode").value||"").trim().toUpperCase()||null;
+  const {error}=await db.from("onboarding_companies").insert({name,code});
   if(error){ toast(/duplicate|unique/i.test(error.message)?"That company already exists":error.message,true); return; }
   toast("Company added ✓"); openCompanies();
+}
+async function setCompanyCode(id,code){
+  code=(code||"").trim().toUpperCase()||null;
+  const {error}=await db.from("onboarding_companies").update({code}).eq("id",id);
+  if(error){ toast(error.message,true); return; }
+  toast("Code saved ✓");
 }
 async function renameCompany(id,name){
   name=(name||"").trim(); if(!name){ openCompanies(); return; }
