@@ -74,6 +74,11 @@
   .lbox .btn{width:100%;padding:12px;font-size:14px}
   .lbox .so{display:block;text-align:center;margin-top:12px}
   #app{display:none}
+  .rowacts{display:flex;gap:6px;align-items:center}
+  .iact{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:5px 8px;font-size:13px;cursor:pointer;line-height:1}
+  .iact:hover{background:var(--line)}
+  .iact.del{color:#ef4444;border-color:rgba(239,68,68,.4)}
+  .iact.del:hover{background:rgba(239,68,68,.15)}
 </style>
 </head>
 <body>
@@ -124,8 +129,8 @@
     <button class="btn" id="newBtn">+ New onboarding request</button>
   </div>
   <div class="card"><table>
-    <thead><tr><th>#</th><th>New hire</th><th>Type</th><th>Company</th><th>Department</th><th>Start date</th><th>IT items</th><th>Status</th><th>Requested</th></tr></thead>
-    <tbody id="rows"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
+    <thead><tr><th>#</th><th>New hire</th><th>Type</th><th>Company</th><th>Department</th><th>Start date</th><th>IT items</th><th>Status</th><th>Requested</th><th>Actions</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="10" class="empty">Loading…</td></tr></tbody>
   </table></div>
 </div>
 </div>
@@ -183,10 +188,17 @@ async function loadReqs(){
   const {data,error}=await db.from("onboarding_requests").select("*").order("created_at",{ascending:false});
   if(error){toast(error.message,true);return;}
   REQS=data||[];
-  if(!REQS.length){ $("#rows").innerHTML=`<tr><td colspan="9" class="empty">No onboarding requests yet. Click “New onboarding request”.</td></tr>`; return; }
+  if(!REQS.length){ $("#rows").innerHTML=`<tr><td colspan="10" class="empty">No onboarding requests yet. Click “New onboarding request”.</td></tr>`; return; }
   $("#rows").innerHTML=REQS.map(r=>{
     const items=Array.isArray(r.items)?r.items:[]; const done=items.filter(x=>x.done).length;
-    return `<tr onclick="openDetail(${r.id})">
+    const mine = (ROLE==="admin") || (ME && r.requested_by===ME.user_id);
+    const disabled = r.status==="cancelled";
+    const actions = mine ? `<div class="rowacts" onclick="event.stopPropagation()">
+        <button class="iact" title="Edit" onclick="openEdit(${r.id})">✏</button>
+        <button class="iact" title="${disabled?'Enable':'Disable'}" onclick="${disabled?`enableReq(${r.id})`:`disableReq(${r.id})`}">${disabled?'▶':'⏸'}</button>
+        <button class="iact del" title="Delete" onclick="delReq(${r.id})">🗑</button>
+      </div>` : '<span style="color:var(--muted);font-size:11px">—</span>';
+    return `<tr onclick="openDetail(${r.id})" ${disabled?'style="opacity:.55"':''}>
       <td><span class="tn">${esc(r.request_number)}</span></td>
       <td>${esc(r.employee_name)}${r.position?`<div style="color:var(--muted);font-size:11px">${esc(r.position)}</div>`:''}</td>
       <td><span class="typ t-${r.employee_type}">${r.employee_type}</span></td>
@@ -196,8 +208,21 @@ async function loadReqs(){
       <td class="prog">${done}/${items.length} done</td>
       <td><span class="pill s-${r.status}">${r.status.replace("_"," ")}</span></td>
       <td style="color:var(--muted)">${esc(r.requested_by_name||'')}<div style="font-size:11px">${ago(r.created_at)}</div></td>
+      <td>${actions}</td>
     </tr>`;
   }).join("");
+}
+async function disableReq(id){
+  const r=REQS.find(x=>x.id===id); if(!r) return;
+  if(!confirm(`Disable (cancel) request ${r.request_number} for ${r.employee_name}? It stays on record and can be re-enabled.`)) return;
+  const {error}=await db.rpc("set_onboarding_status",{p_id:id,p_status:"cancelled"});
+  if(error){ toast(error.message,true); return; }
+  $("#detailModal").classList.remove("show"); resetBadge(); toast("Request disabled ✓"); loadReqs();
+}
+async function enableReq(id){
+  const {error}=await db.rpc("set_onboarding_status",{p_id:id,p_status:"new"});
+  if(error){ toast(error.message,true); return; }
+  $("#detailModal").classList.remove("show"); resetBadge(); toast("Request enabled ✓"); loadReqs();
 }
 function resetForm(){ ["n_name","n_pos","n_dept","n_company","n_start","n_email","n_notes"].forEach(i=>$("#"+i).value=""); $("#n_type").value="employee"; $("#n_m365").value=""; $("#n_jo").value=""; $("#n_err").textContent=""; document.querySelectorAll('#n_items input').forEach(c=>c.checked=false); }
 function openNew(){ EDIT_ID=null; resetForm(); $("#newTitle").textContent="New onboarding request"; $("#n_joLabel").textContent="Job Order (JO) — required *"; $("#n_joHint").textContent="Approved Job Order is the basis for IT to approve this tools request. PDF or image, up to 10 MB."; $("#createBtn").textContent="Submit request"; $("#newModal").classList.add("show"); }
@@ -287,7 +312,7 @@ function openDetail(id){
   const canManage = (ROLE==="admin") || (ME && r.requested_by===ME.user_id);
   $("#detailBody").innerHTML=`
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px">
-      ${canManage?`<button class="btn ghost" style="padding:6px 12px;font-size:12px" onclick="openEdit(${r.id})">✏ Edit</button><button class="btn ghost" style="padding:6px 12px;font-size:12px;color:#ef4444;border-color:rgba(239,68,68,.4)" onclick="delReq(${r.id})">🗑 Delete</button>`:''}
+      ${canManage?`<button class="btn ghost" style="padding:6px 12px;font-size:12px" onclick="openEdit(${r.id})">✏ Edit</button><button class="btn ghost" style="padding:6px 12px;font-size:12px" onclick="${r.status==='cancelled'?`enableReq(${r.id})`:`disableReq(${r.id})`}">${r.status==='cancelled'?'▶ Enable':'⏸ Disable'}</button><button class="btn ghost" style="padding:6px 12px;font-size:12px;color:#ef4444;border-color:rgba(239,68,68,.4)" onclick="delReq(${r.id})">🗑 Delete</button>`:''}
       <button class="btn ghost" style="padding:6px 12px;font-size:12px" onclick="reqPdf(${r.id})">⬇ Download PDF</button></div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><h3 style="font-size:17px">${esc(r.employee_name)}</h3><span class="typ t-${r.employee_type}">${r.employee_type}</span><span class="pill s-${r.status}" style="margin-left:auto">${r.status.replace("_"," ")}</span></div>
     <div class="meta">
