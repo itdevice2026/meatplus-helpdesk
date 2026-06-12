@@ -191,7 +191,7 @@ async function loadReqs(){
   if(!REQS.length){ $("#rows").innerHTML=`<tr><td colspan="10" class="empty">No onboarding requests yet. Click “New onboarding request”.</td></tr>`; return; }
   $("#rows").innerHTML=REQS.map(r=>{
     const items=Array.isArray(r.items)?r.items:[]; const done=items.filter(x=>x.done).length;
-    const mine = (ROLE==="admin") || (ME && r.requested_by===ME.user_id);
+    const mine = (ROLE==="admin" || ROLE==="hr");
     const disabled = r.status==="cancelled";
     const actions = mine ? `<div class="rowacts" onclick="event.stopPropagation()">
         <button class="iact" title="Edit" onclick="openEdit(${r.id})">✏</button>
@@ -309,7 +309,7 @@ function openDetail(id){
   setCompanyBadge(r.company);
   $("#d_num").textContent=r.request_number;
   const items=Array.isArray(r.items)?r.items:[];
-  const canManage = (ROLE==="admin") || (ME && r.requested_by===ME.user_id);
+  const canManage = (ROLE==="admin" || ROLE==="hr");
   $("#detailBody").innerHTML=`
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px">
       ${canManage?`<button class="btn ghost" style="padding:6px 12px;font-size:12px" onclick="openEdit(${r.id})">✏ Edit</button><button class="btn ghost" style="padding:6px 12px;font-size:12px" onclick="${r.status==='cancelled'?`enableReq(${r.id})`:`disableReq(${r.id})`}">${r.status==='cancelled'?'▶ Enable':'⏸ Disable'}</button><button class="btn ghost" style="padding:6px 12px;font-size:12px;color:#ef4444;border-color:rgba(239,68,68,.4)" onclick="delReq(${r.id})">🗑 Delete</button>`:''}
