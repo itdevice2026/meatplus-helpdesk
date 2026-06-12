@@ -148,6 +148,7 @@
     </div>
     <div class="field"><label>IT tools / access needed</label><div class="checks" id="n_items"></div></div>
     <div class="field"><label>Microsoft 365 license</label><select id="n_m365"><option value="">— Not needed —</option><option>Basic</option><option>Business Standard</option><option>Business Apps</option></select></div>
+    <div class="field"><label>Job Order (JO) — required *</label><input type="file" id="n_jo" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" style="width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:10px;font-size:13px"/><div style="color:var(--muted);font-size:11px;margin-top:4px">Approved Job Order is the basis for IT to approve this tools request. PDF or image, up to 10 MB.</div></div>
     <div class="field"><label>Notes (optional)</label><textarea id="n_notes" placeholder="Anything else IT should know…"></textarea></div>
     <div class="err" id="n_err"></div>
   </div>
@@ -191,21 +192,42 @@ async function loadReqs(){
     </tr>`;
   }).join("");
 }
-function openNew(){ ["n_name","n_pos","n_dept","n_start","n_email","n_notes"].forEach(i=>$("#"+i).value=""); $("#n_type").value="employee"; $("#n_m365").value=""; $("#n_err").textContent=""; document.querySelectorAll('#n_items input').forEach(c=>c.checked=false); $("#newModal").classList.add("show"); }
+function openNew(){ ["n_name","n_pos","n_dept","n_start","n_email","n_notes"].forEach(i=>$("#"+i).value=""); $("#n_type").value="employee"; $("#n_m365").value=""; $("#n_jo").value=""; $("#n_err").textContent=""; document.querySelectorAll('#n_items input').forEach(c=>c.checked=false); $("#newModal").classList.add("show"); }
 async function createReq(){
   const name=$("#n_name").value.trim(); $("#n_err").textContent="";
   if(!name){ $("#n_err").textContent="New hire name is required."; return; }
+  const joFiles=$("#n_jo").files;
+  if(!joFiles.length){ $("#n_err").textContent="A Job Order (JO) document is required to submit an IT tools request."; return; }
+  const jo=joFiles[0];
+  if(jo.size>10485760){ $("#n_err").textContent="The JO file is larger than 10 MB."; return; }
   const items=[...document.querySelectorAll('#n_items input:checked')].map(c=>c.value);
-  const btn=$("#createBtn"); btn.disabled=true; btn.textContent="Submitting…";
+  const btn=$("#createBtn"); btn.disabled=true; btn.textContent="Uploading JO…";
+  // Upload the JO document first
+  const ref=crypto.randomUUID();
+  const safe=jo.name.replace(/[^\w.\-]+/g,"_");
+  const {error:ue}=await db.storage.from("onboarding-files").upload(`requests/${ref}/${Date.now()}_${safe}`, jo, {contentType:jo.type||undefined, upsert:false});
+  if(ue){ btn.disabled=false; btn.textContent="Submit request"; $("#n_err").textContent="Couldn't upload the JO: "+ue.message; return; }
+  btn.textContent="Submitting…";
   const {data,error}=await db.rpc("submit_onboarding_request",{
     p_employee_name:name, p_employee_type:$("#n_type").value, p_position:$("#n_pos").value.trim(),
     p_department:$("#n_dept").value.trim(), p_start_date:$("#n_start").value||null,
     p_contact_email:$("#n_email").value.trim(), p_items:items, p_notes:$("#n_notes").value.trim(),
-    p_m365_license:$("#n_m365").value
+    p_m365_license:$("#n_m365").value, p_jo_ref:ref, p_jo_count:1
   });
   btn.disabled=false; btn.textContent="Submit request";
   if(error){ $("#n_err").textContent=error.message; return; }
   $("#newModal").classList.remove("show"); toast("Request "+data+" submitted ✓"); loadReqs();
+}
+async function joLinks(ref){
+  if(!ref) return [];
+  const {data:files}=await db.storage.from("onboarding-files").list("requests/"+ref,{limit:20});
+  const list=(files||[]).filter(f=>f.name && f.name!==".emptyFolderPlaceholder");
+  const out=[];
+  for(const f of list){
+    const {data:s}=await db.storage.from("onboarding-files").createSignedUrl("requests/"+ref+"/"+f.name, 3600);
+    if(s&&s.signedUrl) out.push({name:f.name.replace(/^\d+_/,""), url:s.signedUrl});
+  }
+  return out;
 }
 function openDetail(id){
   const r=REQS.find(x=>x.id===id); if(!r) return;
@@ -224,9 +246,11 @@ function openDetail(id){
     <div class="field"><label>IT tools / access requested</label>
       ${items.length?items.map(it=>`<div class="itemrow ${it.done?'done':''}"><span class="dot">${it.done?'✓':''}</span><span class="lbl">${esc(it.label)}${it.value?' — '+esc(it.value):''}</span></div>`).join(""):'<div style="color:var(--muted)">None specified.</div>'}
     </div>
+    <div class="field"><label>Job Order (JO)</label><div id="d_jo" style="color:var(--muted);font-size:13px">Loading…</div></div>
     ${r.notes?`<div class="field"><label>Notes</label><div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px;white-space:pre-wrap;line-height:1.5;color:#cdd6df">${esc(r.notes)}</div></div>`:''}
     <p style="color:var(--muted);font-size:12px">IT updates progress on their side — check back here to see items completed and status change.</p>`;
   $("#detailModal").classList.add("show");
+  joLinks(r.jo_ref).then(links=>{ const el=$("#d_jo"); if(!el) return; el.innerHTML = links.length ? links.map(l=>`<a href="${l.url}" target="_blank" rel="noopener" style="color:var(--accent,#3b82f6);text-decoration:none;display:inline-block;margin-right:14px">📎 ${esc(l.name)}</a>`).join("") : "No JO on file."; });
 }
 
 /* ---- reports (Excel + PDF) ---- */

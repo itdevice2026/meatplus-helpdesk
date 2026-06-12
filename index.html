@@ -399,6 +399,17 @@ async function openOnbBoard(){
       <tbody>${ONB.map(r=>{const it=Array.isArray(r.items)?r.items:[];const dn=it.filter(x=>x.done).length;return `<tr style="cursor:pointer" onclick="openOnbDetail(${r.id})"><td><span class="tn">${esc(r.request_number)}</span></td><td>${esc(r.employee_name)}</td><td style="text-transform:capitalize">${esc(r.employee_type)}</td><td>${esc(r.department||'—')}</td><td>${onbDate(r.start_date)}</td><td style="color:var(--muted)">${dn}/${it.length}</td><td><span class="pill s-${r.status}">${r.status.replace("_"," ")}</span></td></tr>`;}).join("")}</tbody></table>`
     :`<div class="empty">No onboarding requests yet.</div>`}`;
 }
+async function onbJoLinks(ref){
+  if(!ref) return [];
+  const {data:files}=await db.storage.from("onboarding-files").list("requests/"+ref,{limit:20});
+  const list=(files||[]).filter(f=>f.name && f.name!==".emptyFolderPlaceholder");
+  const out=[];
+  for(const f of list){
+    const {data:s}=await db.storage.from("onboarding-files").createSignedUrl("requests/"+ref+"/"+f.name, 3600);
+    if(s&&s.signedUrl) out.push({name:f.name.replace(/^\d+_/,""), url:s.signedUrl});
+  }
+  return out;
+}
 function openOnbDetail(id){
   const r=ONB.find(x=>x.id===id); if(!r) return;
   $("#onbd_num").textContent=r.request_number;
@@ -417,8 +428,10 @@ function openOnbDetail(id){
     <div class="field"><label>IT items to provision ${ed?'(tick when done)':''}</label>
       ${items.length?items.map((it,idx)=>`<label style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px"><input type="checkbox" ${it.done?'checked':''} ${ed?'':'disabled'} onchange="toggleOnbItem(${id},${idx})"> <span style="${it.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(it.label)}${it.value?' — <b>'+esc(it.value)+'</b>':''}</span></label>`).join(""):'<div style="color:var(--muted)">No items specified.</div>'}
     </div>
+    <div class="field"><label>Job Order (JO) — basis for approval</label><div id="onbd_jo" style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px;color:var(--muted);font-size:13px">Loading…</div></div>
     ${r.notes?`<div class="field"><label>Notes from HR</label><div class="desc">${esc(r.notes)}</div></div>`:''}`;
   $("#onbDetailModal").classList.add("show");
+  onbJoLinks(r.jo_ref).then(links=>{ const el=$("#onbd_jo"); if(!el) return; el.innerHTML = links.length ? links.map(l=>`<a href="${l.url}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;display:inline-block;margin-right:14px">📎 ${esc(l.name)}</a>`).join("") : '<span style="color:var(--red,#ef4444)">⚠ No JO on file.</span>'; });
 }
 async function setOnbStatus(id,status){
   const {error}=await db.from("onboarding_requests").update({status}).eq("id",id);
