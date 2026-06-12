@@ -193,6 +193,7 @@
     <button class="btn ghost sm" id="urgBtn" style="display:none">⚡ Urgency</button>
     <button class="btn ghost sm" id="deptBtn" style="display:none">🏢 Departments</button>
     <button class="btn ghost sm" id="posBtn" style="display:none">🧑‍💼 Positions</button>
+    <button class="btn ghost sm" id="compBtn" style="display:none">🏬 Companies</button>
     <button class="btn ghost sm" id="adminBtn" style="display:none">⚙ Manage team</button>
     <div class="me"><span class="avatar" id="meAvatar"></span><span id="meName"></span><span class="rolebadge" id="meRole"></span></div>
     <button class="signout" id="pwBtn" title="Change your password">Change password</button>
@@ -324,6 +325,14 @@
   </div>
 </div>
 
+<!-- Admin: manage companies modal -->
+<div class="overlay" id="compModal">
+  <div class="modal">
+    <h2>🏬 Manage companies <button class="close" data-close>&times;</button></h2>
+    <div class="body" id="compBody"></div>
+  </div>
+</div>
+
 <!-- Admin: manage team modal -->
 <div class="overlay" id="adminModal">
   <div class="modal">
@@ -419,6 +428,7 @@ function openOnbDetail(id){
   $("#onbDetailBody").innerHTML=`
     <div class="dt-head"><h3 style="font-size:17px">${esc(r.employee_name)}</h3><span style="text-transform:capitalize;color:var(--muted)">${esc(r.employee_type)}</span><button class="btn ghost sm" style="margin-left:auto" onclick="onbReqPdf(${id})">⬇ PDF</button></div>
     <div class="dt-meta">
+      <div><div class="k">Company</div><div class="ro" style="text-transform:none">${esc(r.company||'—')}</div></div>
       <div><div class="k">Position</div><div class="ro">${esc(r.position||'—')}</div></div>
       <div><div class="k">Department</div><div class="ro">${esc(r.department||'—')}</div></div>
       <div><div class="k">Start date</div><div class="ro" style="text-transform:none">${onbDate(r.start_date)}</div></div>
@@ -464,11 +474,11 @@ async function renameOnbItem(id,label){ label=(label||"").trim(); if(!label){ope
 async function toggleOnbItemActive(id,active){ const {error}=await db.from("onboarding_items").update({active}).eq("id",id); if(!error)openOnbItems(); toast(error?error.message:"Updated ✓",!!error); }
 async function removeOnbItem(id){ if(!confirm("Remove this item from the checklist?"))return; const {error}=await db.from("onboarding_items").delete().eq("id",id); if(error){toast(error.message,true);return;} toast("Removed ✓"); openOnbItems(); }
 /* onboarding reports */
-function onbRow(r){ const items=Array.isArray(r.items)?r.items:[]; const m365=(items.find(i=>/microsoft 365 license/i.test(i.label))||{}).value||''; const il=items.filter(i=>!/microsoft 365 license/i.test(i.label)).map(i=>i.label+(i.done?' (done)':'')).join('; '); return {'Request #':r.request_number,'New hire':r.employee_name,'Type':r.employee_type,'Position':r.position||'','Department':r.department||'','Start date':r.start_date||'','IT items':il,'M365 license':m365,'Status':r.status,'Requested by':r.requested_by_name||'','Submitted':new Date(r.created_at).toLocaleString()}; }
+function onbRow(r){ const items=Array.isArray(r.items)?r.items:[]; const m365=(items.find(i=>/microsoft 365 license/i.test(i.label))||{}).value||''; const il=items.filter(i=>!/microsoft 365 license/i.test(i.label)).map(i=>i.label+(i.done?' (done)':'')).join('; '); return {'Request #':r.request_number,'New hire':r.employee_name,'Type':r.employee_type,'Company':r.company||'','Position':r.position||'','Department':r.department||'','Start date':r.start_date||'','IT items':il,'M365 license':m365,'Status':r.status,'Requested by':r.requested_by_name||'','Submitted':new Date(r.created_at).toLocaleString()}; }
 function onbPdfHeader(doc,title){ try{const img=document.querySelector('.mp-badge img'); if(img&&img.complete) doc.addImage(img,'PNG',14,8,28,21);}catch(e){} doc.setFontSize(15); doc.text(title,48,18); doc.setFontSize(9); doc.setTextColor(120); doc.text('Generated '+new Date().toLocaleString(),48,25); doc.setTextColor(0); }
-function onbXlsx(){ if(!ONB.length){toast('No requests to export',true);return;} const ws=XLSX.utils.json_to_sheet(ONB.map(onbRow)); ws['!cols']=[{wch:11},{wch:22},{wch:10},{wch:18},{wch:16},{wch:12},{wch:42},{wch:16},{wch:12},{wch:18},{wch:20}]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Onboarding'); XLSX.writeFile(wb,'onboarding-requests-'+new Date().toISOString().slice(0,10)+'.xlsx'); toast('Excel downloaded ✓'); }
-function onbPdfList(){ if(!ONB.length){toast('No requests to export',true);return;} const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:'landscape'}); onbPdfHeader(doc,'IT Onboarding Requests'); const rows=ONB.map(onbRow); const cols=Object.keys(rows[0]); doc.autoTable({startY:34,head:[cols],body:rows.map(r=>cols.map(c=>r[c])),styles:{fontSize:7,cellPadding:1.5,overflow:'linebreak'},headStyles:{fillColor:[59,130,246]},columnStyles:{6:{cellWidth:46}}}); doc.save('onboarding-requests-'+new Date().toISOString().slice(0,10)+'.pdf'); toast('PDF downloaded ✓'); }
-function onbReqPdf(id){ const r=ONB.find(x=>x.id===id); if(!r)return; const {jsPDF}=window.jspdf; const doc=new jsPDF(); onbPdfHeader(doc,'IT Onboarding Request'); doc.setFontSize(12); doc.text(r.request_number,14,34); const items=Array.isArray(r.items)?r.items:[]; doc.autoTable({startY:40,theme:'plain',styles:{fontSize:10,cellPadding:1.5},columnStyles:{0:{fontStyle:'bold',cellWidth:40}},body:[['New hire',r.employee_name],['Type',r.employee_type],['Position',r.position||'—'],['Department',r.department||'—'],['Start date',r.start_date||'—'],['Contact',r.contact_email||'—'],['Status',r.status],['Requested by',r.requested_by_name||'—']]}); doc.autoTable({startY:doc.lastAutoTable.finalY+6,head:[['IT item / access','Detail','Provided']],body:items.length?items.map(it=>[it.label,it.value||'',it.done?'Yes':'No']):[['(none specified)','','']],headStyles:{fillColor:[59,130,246]},styles:{fontSize:9}}); if(r.notes){ let y=doc.lastAutoTable.finalY+10; doc.setFontSize(11); doc.text('Notes',14,y); doc.setFontSize(9); doc.text(doc.splitTextToSize(r.notes,180),14,y+6); } doc.save(r.request_number+'.pdf'); }
+function onbXlsx(){ if(!ONB.length){toast('No requests to export',true);return;} const ws=XLSX.utils.json_to_sheet(ONB.map(onbRow)); ws['!cols']=[{wch:11},{wch:22},{wch:10},{wch:26},{wch:18},{wch:16},{wch:12},{wch:42},{wch:16},{wch:12},{wch:18},{wch:20}]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Onboarding'); XLSX.writeFile(wb,'onboarding-requests-'+new Date().toISOString().slice(0,10)+'.xlsx'); toast('Excel downloaded ✓'); }
+function onbPdfList(){ if(!ONB.length){toast('No requests to export',true);return;} const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:'landscape'}); onbPdfHeader(doc,'IT Onboarding Requests'); const rows=ONB.map(onbRow); const cols=Object.keys(rows[0]); doc.autoTable({startY:34,head:[cols],body:rows.map(r=>cols.map(c=>r[c])),styles:{fontSize:7,cellPadding:1.5,overflow:'linebreak'},headStyles:{fillColor:[59,130,246]},columnStyles:{7:{cellWidth:42}}}); doc.save('onboarding-requests-'+new Date().toISOString().slice(0,10)+'.pdf'); toast('PDF downloaded ✓'); }
+function onbReqPdf(id){ const r=ONB.find(x=>x.id===id); if(!r)return; const {jsPDF}=window.jspdf; const doc=new jsPDF(); onbPdfHeader(doc,'IT Onboarding Request'); doc.setFontSize(12); doc.text(r.request_number,14,34); const items=Array.isArray(r.items)?r.items:[]; doc.autoTable({startY:40,theme:'plain',styles:{fontSize:10,cellPadding:1.5},columnStyles:{0:{fontStyle:'bold',cellWidth:40}},body:[['New hire',r.employee_name],['Type',r.employee_type],['Company',r.company||'—'],['Position',r.position||'—'],['Department',r.department||'—'],['Start date',r.start_date||'—'],['Contact',r.contact_email||'—'],['Status',r.status],['Requested by',r.requested_by_name||'—']]}); doc.autoTable({startY:doc.lastAutoTable.finalY+6,head:[['IT item / access','Detail','Provided']],body:items.length?items.map(it=>[it.label,it.value||'',it.done?'Yes':'No']):[['(none specified)','','']],headStyles:{fillColor:[59,130,246]},styles:{fontSize:9}}); if(r.notes){ let y=doc.lastAutoTable.finalY+10; doc.setFontSize(11); doc.text('Notes',14,y); doc.setFontSize(9); doc.text(doc.splitTextToSize(r.notes,180),14,y+6); } doc.save(r.request_number+'.pdf'); }
 
 let SUBJECTS=[];
 async function loadSubjects(){
@@ -620,6 +630,54 @@ async function removePosition(id){
   const {error}=await db.from("positions").delete().eq("id",id);
   if(error){ toast(error.message,true); return; }
   toast("Removed ✓"); openPositions();
+}
+
+async function openCompanies(){
+  $("#compModal").classList.add("show");
+  $("#compBody").innerHTML=`<div class="loading">Loading…</div>`;
+  const {data}=await db.from("onboarding_companies").select("*").order("sort_order").order("name");
+  $("#compBody").innerHTML=`
+    <style>
+      #compBody .sin{width:100%;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit}
+      #compBody .addbox{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:16px;display:flex;gap:8px}
+      #compBody .srow{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+      #compBody .srow .lbl{flex:1}
+      #compBody .off{opacity:.5}
+    </style>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:10px">These appear as the Company choices on the HR onboarding form.</p>
+    <div class="addbox">
+      <input class="sin" id="comp_new" placeholder="Add a new company…" />
+      <button class="btn sm" onclick="addCompany()">Add</button>
+    </div>
+    ${(data||[]).map(c=>`
+      <div class="srow ${c.active?'':'off'}">
+        <input class="sin lbl" value="${esc(c.name)}" onchange="renameCompany('${c.id}',this.value)" />
+        <button class="btn ghost sm" onclick="toggleCompany('${c.id}',${c.active?'false':'true'})">${c.active?'Hide':'Show'}</button>
+        <button class="btn danger sm" onclick="removeCompany('${c.id}')">Remove</button>
+      </div>`).join("")}`;
+}
+async function addCompany(){
+  const name=$("#comp_new").value.trim(); if(!name){ toast("Type a company first",true); return; }
+  const {error}=await db.from("onboarding_companies").insert({name});
+  if(error){ toast(/duplicate|unique/i.test(error.message)?"That company already exists":error.message,true); return; }
+  toast("Company added ✓"); openCompanies();
+}
+async function renameCompany(id,name){
+  name=(name||"").trim(); if(!name){ openCompanies(); return; }
+  const {error}=await db.from("onboarding_companies").update({name}).eq("id",id);
+  if(error){ toast(/duplicate|unique/i.test(error.message)?"Another company already has that name":error.message,true); openCompanies(); return; }
+  toast("Renamed ✓");
+}
+async function toggleCompany(id,active){
+  const {error}=await db.from("onboarding_companies").update({active}).eq("id",id);
+  if(error){ toast(error.message,true); return; }
+  toast(active?"Shown ✓":"Hidden ✓"); openCompanies();
+}
+async function removeCompany(id){
+  if(!confirm("Remove this company from the list? Existing requests keep their company; it just won't be offered as a future choice.")) return;
+  const {error}=await db.from("onboarding_companies").delete().eq("id",id);
+  if(error){ toast(error.message,true); return; }
+  toast("Removed ✓"); openCompanies();
 }
 
 async function loadStats(){
@@ -895,6 +953,7 @@ $("#subjBtn").onclick=openSubjects;
 $("#urgBtn").onclick=openUrgency;
 $("#deptBtn").onclick=openDepts;
 $("#posBtn").onclick=openPositions;
+$("#compBtn").onclick=openCompanies;
 $("#onbBtn").onclick=openOnbBoard;
 $("#n_category").addEventListener("change",e=>{ const p=CATURG[e.target.value]; if(p) $("#n_priority").value=p; });
 ["search","fStatus","fPriority","fAgent"].forEach(id=>$("#"+id).addEventListener("input",render));
@@ -914,6 +973,7 @@ function applyRole(){
   $("#urgBtn").style.display = isAdmin() ? "" : "none";
   $("#deptBtn").style.display = isAdmin() ? "" : "none";
   $("#posBtn").style.display = isAdmin() ? "" : "none";
+  $("#compBtn").style.display = isAdmin() ? "" : "none";
   $("#onbBtn").style.display = "";
   $("#roBanner").style.display = ROLE==='manager' ? "block" : "none";
 }

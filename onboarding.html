@@ -138,6 +138,7 @@
       <div class="field"><label>New hire full name *</label><input id="n_name" placeholder="Full name"/></div>
       <div class="field"><label>Type</label><select id="n_type"><option value="employee">Employee</option><option value="intern">Intern</option></select></div>
     </div>
+    <div class="field"><label>Company</label><select id="n_company"><option value="">— Select company —</option></select></div>
     <div class="row2">
       <div class="field"><label>Position / title</label><select id="n_pos"><option value="">— Select position —</option></select></div>
       <div class="field"><label>Department</label><select id="n_dept"><option value="">— Select department —</option></select></div>
@@ -173,6 +174,7 @@ function toast(m,e){const t=$("#toast");t.textContent=m;t.className="toast show"
 async function loadItems(){ const {data}=await db.from("onboarding_items").select("*").eq("active",true).order("sort").order("label"); ITEMS=data||[]; $("#n_items").innerHTML=ITEMS.map(i=>`<label class="chk"><input type="checkbox" value="${esc(i.label)}"> ${esc(i.label)}</label>`).join(""); }
 async function loadDepts(){ const {data}=await db.from("departments").select("name").eq("active",true).order("sort_order").order("name"); const sel=$("#n_dept"); if(sel&&data){ sel.innerHTML='<option value="">— Select department —</option>'+data.map(d=>`<option value="${esc(d.name)}">${esc(d.name)}</option>`).join(""); } }
 async function loadPositions(){ const {data}=await db.from("positions").select("name").eq("active",true).order("sort_order").order("name"); const sel=$("#n_pos"); if(sel&&data){ sel.innerHTML='<option value="">— Select position —</option>'+data.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join(""); } }
+async function loadCompanies(){ const {data}=await db.from("onboarding_companies").select("name").eq("active",true).order("sort_order").order("name"); const sel=$("#n_company"); if(sel&&data){ sel.innerHTML='<option value="">— Select company —</option>'+data.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join(""); } }
 async function loadReqs(){
   const {data,error}=await db.from("onboarding_requests").select("*").order("created_at",{ascending:false});
   if(error){toast(error.message,true);return;}
@@ -192,7 +194,7 @@ async function loadReqs(){
     </tr>`;
   }).join("");
 }
-function resetForm(){ ["n_name","n_pos","n_dept","n_start","n_email","n_notes"].forEach(i=>$("#"+i).value=""); $("#n_type").value="employee"; $("#n_m365").value=""; $("#n_jo").value=""; $("#n_err").textContent=""; document.querySelectorAll('#n_items input').forEach(c=>c.checked=false); }
+function resetForm(){ ["n_name","n_pos","n_dept","n_company","n_start","n_email","n_notes"].forEach(i=>$("#"+i).value=""); $("#n_type").value="employee"; $("#n_m365").value=""; $("#n_jo").value=""; $("#n_err").textContent=""; document.querySelectorAll('#n_items input').forEach(c=>c.checked=false); }
 function openNew(){ EDIT_ID=null; resetForm(); $("#newTitle").textContent="New onboarding request"; $("#n_joLabel").textContent="Job Order (JO) — required *"; $("#n_joHint").textContent="Approved Job Order is the basis for IT to approve this tools request. PDF or image, up to 10 MB."; $("#createBtn").textContent="Submit request"; $("#newModal").classList.add("show"); }
 function openEdit(id){
   const r=REQS.find(x=>x.id===id); if(!r) return;
@@ -202,7 +204,7 @@ function openEdit(id){
   $("#n_joHint").textContent="Leave blank to keep the current JO. Upload a new file only to replace it.";
   $("#createBtn").textContent="Save changes";
   $("#n_name").value=r.employee_name||""; $("#n_type").value=r.employee_type||"employee";
-  $("#n_pos").value=r.position||""; $("#n_dept").value=r.department||"";
+  $("#n_pos").value=r.position||""; $("#n_dept").value=r.department||""; $("#n_company").value=r.company||"";
   $("#n_start").value=r.start_date||""; $("#n_email").value=r.contact_email||""; $("#n_notes").value=r.notes||"";
   const items=Array.isArray(r.items)?r.items:[];
   const m365=(items.find(i=>/microsoft 365 license/i.test(i.label))||{}).value||""; $("#n_m365").value=m365;
@@ -233,7 +235,7 @@ async function createReq(){
       p_id:EDIT_ID, p_employee_name:name, p_employee_type:$("#n_type").value, p_position:$("#n_pos").value.trim(),
       p_department:$("#n_dept").value.trim(), p_start_date:$("#n_start").value||null,
       p_contact_email:$("#n_email").value.trim(), p_items:items, p_notes:$("#n_notes").value.trim(),
-      p_m365_license:$("#n_m365").value, p_jo_ref:newRef
+      p_m365_license:$("#n_m365").value, p_jo_ref:newRef, p_company:$("#n_company").value
     });
     btn.disabled=false; btn.textContent="Save changes";
     if(error){ $("#n_err").textContent=error.message; return; }
@@ -255,7 +257,7 @@ async function createReq(){
     p_employee_name:name, p_employee_type:$("#n_type").value, p_position:$("#n_pos").value.trim(),
     p_department:$("#n_dept").value.trim(), p_start_date:$("#n_start").value||null,
     p_contact_email:$("#n_email").value.trim(), p_items:items, p_notes:$("#n_notes").value.trim(),
-    p_m365_license:$("#n_m365").value, p_jo_ref:ref, p_jo_count:1
+    p_m365_license:$("#n_m365").value, p_jo_ref:ref, p_jo_count:1, p_company:$("#n_company").value
   });
   btn.disabled=false; btn.textContent="Submit request";
   if(error){ $("#n_err").textContent=error.message; return; }
@@ -283,6 +285,7 @@ function openDetail(id){
       <button class="btn ghost" style="padding:6px 12px;font-size:12px" onclick="reqPdf(${r.id})">⬇ Download PDF</button></div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><h3 style="font-size:17px">${esc(r.employee_name)}</h3><span class="typ t-${r.employee_type}">${r.employee_type}</span><span class="pill s-${r.status}" style="margin-left:auto">${r.status.replace("_"," ")}</span></div>
     <div class="meta">
+      <div><div class="k">Company</div>${esc(r.company||'—')}</div>
       <div><div class="k">Position</div>${esc(r.position||'—')}</div>
       <div><div class="k">Department</div>${esc(r.department||'—')}</div>
       <div><div class="k">Start date</div>${fmtD(r.start_date)}</div>
@@ -307,11 +310,11 @@ async function delReq(id){
 }
 
 /* ---- reports (Excel + PDF) ---- */
-function onbRow(r){ const items=Array.isArray(r.items)?r.items:[]; const m365=(items.find(i=>/microsoft 365 license/i.test(i.label))||{}).value||''; const il=items.filter(i=>!/microsoft 365 license/i.test(i.label)).map(i=>i.label+(i.done?' (done)':'')).join('; '); return {'Request #':r.request_number,'New hire':r.employee_name,'Type':r.employee_type,'Position':r.position||'','Department':r.department||'','Start date':r.start_date||'','IT items':il,'M365 license':m365,'Status':r.status,'Requested by':r.requested_by_name||'','Submitted':new Date(r.created_at).toLocaleString()}; }
+function onbRow(r){ const items=Array.isArray(r.items)?r.items:[]; const m365=(items.find(i=>/microsoft 365 license/i.test(i.label))||{}).value||''; const il=items.filter(i=>!/microsoft 365 license/i.test(i.label)).map(i=>i.label+(i.done?' (done)':'')).join('; '); return {'Request #':r.request_number,'New hire':r.employee_name,'Type':r.employee_type,'Company':r.company||'','Position':r.position||'','Department':r.department||'','Start date':r.start_date||'','IT items':il,'M365 license':m365,'Status':r.status,'Requested by':r.requested_by_name||'','Submitted':new Date(r.created_at).toLocaleString()}; }
 function pdfHeader(doc,title){ try{const img=document.querySelector('.mp-badge img'); if(img&&img.complete) doc.addImage(img,'PNG',14,8,28,21);}catch(e){} doc.setFontSize(15); doc.text(title,48,18); doc.setFontSize(9); doc.setTextColor(120); doc.text('Generated '+new Date().toLocaleString(),48,25); doc.setTextColor(0); }
-function exportXlsx(){ if(!REQS.length){toast('No requests to export',true);return;} const ws=XLSX.utils.json_to_sheet(REQS.map(onbRow)); ws['!cols']=[{wch:11},{wch:22},{wch:10},{wch:18},{wch:16},{wch:12},{wch:42},{wch:16},{wch:12},{wch:18},{wch:20}]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Onboarding'); XLSX.writeFile(wb,'onboarding-requests-'+new Date().toISOString().slice(0,10)+'.xlsx'); toast('Excel downloaded ✓'); }
-function exportPdfList(){ if(!REQS.length){toast('No requests to export',true);return;} const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:'landscape'}); pdfHeader(doc,'IT Onboarding Requests'); const rows=REQS.map(onbRow); const cols=Object.keys(rows[0]); doc.autoTable({startY:34,head:[cols],body:rows.map(r=>cols.map(c=>r[c])),styles:{fontSize:7,cellPadding:1.5,overflow:'linebreak'},headStyles:{fillColor:[59,130,246]},columnStyles:{6:{cellWidth:46}}}); doc.save('onboarding-requests-'+new Date().toISOString().slice(0,10)+'.pdf'); toast('PDF downloaded ✓'); }
-function reqPdf(id){ const r=REQS.find(x=>x.id===id); if(!r)return; const {jsPDF}=window.jspdf; const doc=new jsPDF(); pdfHeader(doc,'IT Onboarding Request'); doc.setFontSize(12); doc.text(r.request_number,14,34); const items=Array.isArray(r.items)?r.items:[]; doc.autoTable({startY:40,theme:'plain',styles:{fontSize:10,cellPadding:1.5},columnStyles:{0:{fontStyle:'bold',cellWidth:40}},body:[['New hire',r.employee_name],['Type',r.employee_type],['Position',r.position||'—'],['Department',r.department||'—'],['Start date',r.start_date||'—'],['Contact',r.contact_email||'—'],['Status',r.status],['Requested by',r.requested_by_name||'—']]}); doc.autoTable({startY:doc.lastAutoTable.finalY+6,head:[['IT item / access','Detail','Provided']],body:items.length?items.map(it=>[it.label,it.value||'',it.done?'Yes':'No']):[['(none specified)','','']],headStyles:{fillColor:[59,130,246]},styles:{fontSize:9}}); if(r.notes){ let y=doc.lastAutoTable.finalY+10; doc.setFontSize(11); doc.text('Notes',14,y); doc.setFontSize(9); doc.text(doc.splitTextToSize(r.notes,180),14,y+6); } doc.save(r.request_number+'.pdf'); }
+function exportXlsx(){ if(!REQS.length){toast('No requests to export',true);return;} const ws=XLSX.utils.json_to_sheet(REQS.map(onbRow)); ws['!cols']=[{wch:11},{wch:22},{wch:10},{wch:26},{wch:18},{wch:16},{wch:12},{wch:42},{wch:16},{wch:12},{wch:18},{wch:20}]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Onboarding'); XLSX.writeFile(wb,'onboarding-requests-'+new Date().toISOString().slice(0,10)+'.xlsx'); toast('Excel downloaded ✓'); }
+function exportPdfList(){ if(!REQS.length){toast('No requests to export',true);return;} const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:'landscape'}); pdfHeader(doc,'IT Onboarding Requests'); const rows=REQS.map(onbRow); const cols=Object.keys(rows[0]); doc.autoTable({startY:34,head:[cols],body:rows.map(r=>cols.map(c=>r[c])),styles:{fontSize:7,cellPadding:1.5,overflow:'linebreak'},headStyles:{fillColor:[59,130,246]},columnStyles:{7:{cellWidth:42}}}); doc.save('onboarding-requests-'+new Date().toISOString().slice(0,10)+'.pdf'); toast('PDF downloaded ✓'); }
+function reqPdf(id){ const r=REQS.find(x=>x.id===id); if(!r)return; const {jsPDF}=window.jspdf; const doc=new jsPDF(); pdfHeader(doc,'IT Onboarding Request'); doc.setFontSize(12); doc.text(r.request_number,14,34); const items=Array.isArray(r.items)?r.items:[]; doc.autoTable({startY:40,theme:'plain',styles:{fontSize:10,cellPadding:1.5},columnStyles:{0:{fontStyle:'bold',cellWidth:40}},body:[['New hire',r.employee_name],['Type',r.employee_type],['Company',r.company||'—'],['Position',r.position||'—'],['Department',r.department||'—'],['Start date',r.start_date||'—'],['Contact',r.contact_email||'—'],['Status',r.status],['Requested by',r.requested_by_name||'—']]}); doc.autoTable({startY:doc.lastAutoTable.finalY+6,head:[['IT item / access','Detail','Provided']],body:items.length?items.map(it=>[it.label,it.value||'',it.done?'Yes':'No']):[['(none specified)','','']],headStyles:{fillColor:[59,130,246]},styles:{fontSize:9}}); if(r.notes){ let y=doc.lastAutoTable.finalY+10; doc.setFontSize(11); doc.text('Notes',14,y); doc.setFontSize(9); doc.text(doc.splitTextToSize(r.notes,180),14,y+6); } doc.save(r.request_number+'.pdf'); }
 $("#xlsBtn").onclick=exportXlsx; $("#pdfBtn").onclick=exportPdfList;
 
 /* change password */
@@ -344,7 +347,7 @@ async function enter(){
   $("#login").style.display="none"; $("#forcePw").style.display="none"; $("#noaccess").style.display="none"; $("#app").style.display="block";
   $("#meName").textContent=ME.name; $("#meAvatar").textContent=initials(ME.name); $("#meRole").textContent=ROLE;
   if(ROLE==="admin") $("#itLink").style.display="inline";
-  await loadItems(); await loadDepts(); await loadPositions(); await loadReqs();
+  await loadItems(); await loadDepts(); await loadPositions(); await loadCompanies(); await loadReqs();
 }
 (async()=>{ const {data:{session}}=await db.auth.getSession(); if(session) start(); else $("#login").style.display="grid"; })();
 </script>
