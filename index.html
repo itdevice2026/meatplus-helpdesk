@@ -14,6 +14,13 @@
     --txt:#e6edf3; --muted:#8b98a5; --accent:#3b82f6; --accent2:#2563eb;
     --green:#22c55e; --amber:#f59e0b; --red:#ef4444; --purple:#a855f7; --cyan:#06b6d4;
   }
+  /* ---- color themes ---- */
+  html[data-theme=light]{--bg:#eef2f7;--panel:#ffffff;--panel2:#f3f6fa;--line:#dbe3ec;--txt:#0f172a;--muted:#5b6b7c;--accent:#2563eb;--accent2:#1d4ed8}
+  html[data-theme=blue]{--bg:#0b1220;--panel:#111c33;--panel2:#16243f;--line:#243a5e;--txt:#e6edf6;--muted:#8da2c0;--accent:#3b82f6;--accent2:#2563eb}
+  html[data-theme=slate]{--bg:#1a1d21;--panel:#24282e;--panel2:#2d323a;--line:#3a4049;--txt:#e8eaed;--muted:#9aa3ad;--accent:#0ea5e9;--accent2:#0284c7}
+  html[data-theme=forest]{--bg:#0e1a14;--panel:#13241b;--panel2:#1a2f23;--line:#274234;--txt:#e6f3ec;--muted:#8fae9d;--accent:#22c55e;--accent2:#16a34a}
+  html[data-theme=light] body,html[data-theme=blue] body,html[data-theme=slate] body,html[data-theme=forest] body{background:var(--bg)}
+  .mp-theme-sel{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12px;font-family:inherit;cursor:pointer}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
   header{background:var(--panel);border-bottom:1px solid var(--line);padding:14px 22px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:50}
@@ -150,6 +157,12 @@
   .mp-badge.lg{padding:14px 24px;border-radius:14px}
   .mp-badge.lg img{height:82px}
 </style>
+<script>
+  // Apply saved color theme before paint (no flash)
+  (function(){var t=localStorage.getItem('mp-theme'); if(t&&t!=='dark') document.documentElement.dataset.theme=t;})();
+  function setTheme(v){ if(v&&v!=='dark') document.documentElement.dataset.theme=v; else document.documentElement.removeAttribute('data-theme'); localStorage.setItem('mp-theme', v||'dark'); }
+  document.addEventListener('DOMContentLoaded',function(){var s=document.getElementById('themeSel'); if(s) s.value=localStorage.getItem('mp-theme')||'dark';});
+</script>
 </head>
 <body>
 <div id="login">
@@ -195,6 +208,7 @@
     <button class="btn ghost sm" id="posBtn" style="display:none">🧑‍💼 Positions</button>
     <button class="btn ghost sm" id="compBtn" style="display:none">🏬 Companies</button>
     <button class="btn ghost sm" id="adminBtn" style="display:none">⚙ Manage team</button>
+    <select class="mp-theme-sel" id="themeSel" title="Color theme" onchange="setTheme(this.value)"><option value="dark">🌙 Dark</option><option value="light">☀️ Light</option><option value="blue">🌌 Midnight</option><option value="slate">🪨 Slate</option><option value="forest">🌲 Forest</option></select>
     <div class="me"><span class="avatar" id="meAvatar"></span><span id="meName"></span><span class="rolebadge" id="meRole"></span></div>
     <button class="signout" id="pwBtn" title="Change your password">Change password</button>
     <button class="signout" id="signoutBtn" title="Sign out">Sign out</button>
