@@ -123,7 +123,7 @@ async function render(d){
   if(d.attachment_count>0 && d.attachment_ref){
     const {data:files}=await db.storage.from("ticket-files").list("tickets/"+d.attachment_ref,{limit:50});
     const list=(files||[]).filter(f=>f.name && f.name!==".emptyFolderPlaceholder");
-    if(list.length) attHtml=`<div class="atts"><div class="k" style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Your attachments</div>${list.map(f=>`<a href="${PUB("tickets/"+d.attachment_ref+"/"+f.name)}" target="_blank" rel="noopener">📎 ${esc(f.name.replace(/^\d+_/,""))}</a>`).join("")}</div>`;
+    if(list.length) attHtml=`<div class="atts"><div class="k" style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Attachments &amp; documents</div>${list.map(f=>`<a href="${PUB("tickets/"+d.attachment_ref+"/"+f.name)}" target="_blank" rel="noopener">📎 ${esc(f.name.replace(/^\d+_/,""))}</a>`).join("")}</div>`;
   }
   const replies=(d.comments||[]);
   const repliesHtml = replies.length

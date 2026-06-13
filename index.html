@@ -814,7 +814,7 @@ async function openDetail(id){
       <div><div class="k">Assigned to</div>${assignField}</div>
     </div>
     <div class="field"><label>Description</label><div class="desc">${esc(t.description)||'<span style="color:var(--muted)">No description.</span>'}</div></div>
-    ${t.attachment_count>0?`<div class="field" id="attBox"><label>Attachments (${t.attachment_count})</label><div style="color:var(--muted);font-size:12px">Loading…</div></div>`:''}
+    <div class="field" id="attBox"><label>Attachments / documents</label><div style="color:var(--muted);font-size:12px">Loading…</div></div>
     <div class="tabs">
       <button class="active" onclick="switchTab(this,'tabComments')">💬 Comments (${comments?.length||0})</button>
       <button onclick="switchTab(this,'tabActivity')">📋 Activity (${activity?.length||0})</button>
@@ -835,13 +835,20 @@ async function openDetail(id){
     <div id="tabActivity" style="display:none">
       ${(activity||[]).map(a=>`<div class="act"><span class="ico">${actIcon(a.action)}</span><div style="flex:1"><b>${esc(a.actor)}</b> ${esc(a.action.replace("_"," "))} <span style="color:var(--muted)">${esc(a.detail)}</span></div><span class="tm">${fmt(a.created_at)}</span></div>`).join("") || '<div style="color:var(--muted)">No activity.</div>'}
     </div>`;
-  if(t.attachment_count>0 && t.attachment_ref) loadAttachments(t.attachment_ref, t.id);
+  loadAttachments(t.attachment_ref, t.id);
 }
 async function loadAttachments(ref, ticketId){
   const box=$("#attBox"); if(!box) return;
-  const {data,error}=await db.storage.from("ticket-files").list("tickets/"+ref,{limit:50});
-  const files=(data||[]).filter(f=>f.name && f.name!==".emptyFolderPlaceholder");
-  if(error||!files.length){ box.innerHTML=`<label>Attachments</label><div style="color:var(--muted);font-size:12px">${error?'Could not load attachments.':'None.'}</div>`; return; }
+  let files=[];
+  if(ref){
+    const {data,error}=await db.storage.from("ticket-files").list("tickets/"+ref,{limit:50});
+    if(!error) files=(data||[]).filter(f=>f.name && f.name!==".emptyFolderPlaceholder");
+  }
+  const up = canEdit()?`<input type="file" id="att_up" multiple style="display:none" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" onchange="uploadTicketDocs(${ticketId})"><button class="btn ghost sm" id="att_upbtn" onclick="document.getElementById('att_up').click()">⬆ Upload document</button>`:'';
+  if(!files.length){
+    box.innerHTML=`<label>Attachments / documents</label><div style="display:flex;align-items:center;gap:10px;margin-top:4px"><span style="color:var(--muted);font-size:12px">No files yet.${canEdit()?' Upload a document for the requester to download.':''}</span>${up}</div>`;
+    return;
+  }
   const items=files.map(f=>{
     const path="tickets/"+ref+"/"+f.name;
     const url=db.storage.from("ticket-files").getPublicUrl(path).data.publicUrl;
@@ -851,7 +858,25 @@ async function loadAttachments(ref, ticketId){
     const inner=isImg?`<img src="${url}" alt="${display}">`:`<span class="ph">📄</span>`;
     return `<div class="att">${del}<a href="${url}" target="_blank" rel="noopener" title="${display}">${inner}</a><span class="nm">${display}</span></div>`;
   });
-  box.innerHTML=`<label>Attachments (${items.length})</label><div class="attwrap">${items.join("")}</div>`;
+  box.innerHTML=`<label>Attachments / documents (${items.length})</label>${up?`<div style="margin:4px 0 8px">${up}</div>`:''}<div class="attwrap">${items.join("")}</div>`;
+}
+async function uploadTicketDocs(ticketId){
+  const inp=$("#att_up"); const files=inp&&inp.files?[...inp.files]:[];
+  if(!files.length) return;
+  const t=TICKETS.find(x=>x.id===ticketId); if(!t) return;
+  const ref=t.attachment_ref || crypto.randomUUID();
+  const btn=$("#att_upbtn"); if(btn){ btn.disabled=true; btn.textContent="Uploading…"; }
+  for(const f of files){
+    if(f.size>10485760){ toast(`"${f.name}" is larger than 10 MB`,true); continue; }
+    const safe=f.name.replace(/[^\w.\-]+/g,"_");
+    const {error}=await db.storage.from("ticket-files").upload(`tickets/${ref}/${Date.now()}_${safe}`, f, {contentType:f.type||undefined, upsert:false});
+    if(error){ toast(`Couldn't upload "${f.name}": `+error.message,true); }
+  }
+  const {data}=await db.storage.from("ticket-files").list("tickets/"+ref,{limit:50});
+  const n=(data||[]).filter(f=>f.name && f.name!==".emptyFolderPlaceholder").length;
+  await db.from("tickets").update({attachment_ref:ref, attachment_count:n}).eq("id",ticketId);
+  toast("Document uploaded ✓ — the requester can download it from the status page");
+  await loadTickets(); openDetail(ticketId);
 }
 async function deleteAttachment(path, ticketId){
   if(!confirm("Delete this attachment? This cannot be undone.")) return;
